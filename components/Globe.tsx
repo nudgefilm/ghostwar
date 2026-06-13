@@ -224,96 +224,107 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const scene = sceneRef.current
       if (!scene) return
 
-      const trailColor = type === 'nuke' ? 0xff6600 : 0xff2233
-      const spriteSize  = type === 'nuke' ? 0.12 : 0.08
-      const CURVE_SEGS  = 60
+      const missileColor = type === 'nuke' ? 0xff6600 : 0xff4444
+      const yAxis = new THREE.Vector3(0, 1, 0)
 
       for (let i = 0; i < quantity; i++) {
         setTimeout(() => {
           const from = latLngToVec3(fromLat, fromLng, RADIUS + 0.01)
           const to   = latLngToVec3(toLat,   toLng,   RADIUS + 0.01)
-
-          const mid = new THREE.Vector3()
+          const mid  = new THREE.Vector3()
             .addVectors(from, to)
             .multiplyScalar(0.5)
             .normalize()
             .multiplyScalar(RADIUS * 1.4)
-
           const curve = new THREE.QuadraticBezierCurve3(from, mid, to)
 
-          // ── Trail (BufferGeometry, setDrawRange grows each frame) ─
-          const allPts = curve.getPoints(CURVE_SEGS)
-          const posBuf = new Float32Array((CURVE_SEGS + 1) * 3)
-          allPts.forEach((p, idx) => {
-            posBuf[idx * 3]     = p.x
-            posBuf[idx * 3 + 1] = p.y
-            posBuf[idx * 3 + 2] = p.z
-          })
+          // ── Trail — rebuilt each frame from visited points ─────────────
+          const visitedPoints: THREE.Vector3[] = []
           const trailGeo = new THREE.BufferGeometry()
-          trailGeo.setAttribute('position', new THREE.BufferAttribute(posBuf, 3))
-          trailGeo.setDrawRange(0, 2)
-          const trailMat = new THREE.LineBasicMaterial({ color: trailColor, transparent: true, opacity: 0.8 })
+          const trailMat = new THREE.LineBasicMaterial({ color: 0xff2233, transparent: true, opacity: 0.8 })
           const trail = new THREE.Line(trailGeo, trailMat)
           scene.add(trail)
 
-          // ── Sprite head (canvas triangle pointing tip-up) ─────────
-          const cvs = document.createElement('canvas')
-          cvs.width = 32; cvs.height = 32
-          const ctx2d = cvs.getContext('2d')
-          if (ctx2d) {
-            ctx2d.fillStyle = type === 'nuke' ? '#FF6600' : '#FF2233'
-            ctx2d.beginPath()
-            ctx2d.moveTo(16, 0)
-            ctx2d.lineTo(24, 32)
-            ctx2d.lineTo(8, 32)
-            ctx2d.closePath()
-            ctx2d.fill()
-          }
-          const tex = new THREE.CanvasTexture(cvs)
-          tex.flipY = false // preserve canvas orientation so tip=top
-          const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 1 })
-          const sprite = new THREE.Sprite(spriteMat)
-          sprite.scale.set(spriteSize, spriteSize, 1)
-          scene.add(sprite)
+          // ── Cone missile (ConeGeometry, tip at +Y, oriented via quaternion) ─
+          const missileGeo = new THREE.ConeGeometry(0.012, 0.05, 6)
+          const missileMat = new THREE.MeshBasicMaterial({ color: missileColor })
+          const missileMesh = new THREE.Mesh(missileGeo, missileMat)
+          scene.add(missileMesh)
 
+          // ── Exhaust particles (shared geometry, individual materials) ───
+          const pGeo = new THREE.SphereGeometry(0.008, 3, 3)
+          const particles: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; age: number }> = []
+
+          const orientQ = new THREE.Quaternion()
           const t0 = performance.now()
 
           const anim: AnimFn = () => {
             const t = Math.min((performance.now() - t0) / duration, 1)
-
             const currentPos = curve.getPoint(t)
-            sprite.position.copy(currentPos)
 
-            // Rotate sprite to face direction of travel
-            const cam = cameraRef.current
-            if (cam && t < 0.99) {
-              const nextPos = curve.getPoint(Math.min(t + 0.02, 1))
-              const worldDir = nextPos.clone().sub(currentPos).normalize()
-              const camDir = worldDir.clone().transformDirection(cam.matrixWorldInverse)
-              spriteMat.rotation = Math.atan2(camDir.x, camDir.y)
+            // Position and orient cone toward direction of travel
+            missileMesh.position.copy(currentPos)
+            if (t < 0.99) {
+              const nextPos = curve.getPoint(Math.min(t + 0.01, 1))
+              const dir = nextPos.clone().sub(currentPos).normalize()
+              orientQ.setFromUnitVectors(yAxis, dir)
+              missileMesh.quaternion.copy(orientQ)
             }
 
-            // Grow trail
-            const visiblePts = Math.max(2, Math.ceil(t * CURVE_SEGS) + 1)
-            trailGeo.setDrawRange(0, Math.min(visiblePts, CURVE_SEGS + 1))
-            if (t > 0.8) trailMat.opacity = 0.8 * (1 - (t - 0.8) / 0.2)
+            // Rebuild trail from all visited positions
+            visitedPoints.push(currentPos.clone())
+            if (visitedPoints.length >= 2) {
+              trailGeo.setFromPoints(visitedPoints)
+            }
+
+            // Spawn 3–5 exhaust particles at current position
+            const spawnCount = 3 + Math.floor(Math.random() * 3)
+            for (let p = 0; p < spawnCount; p++) {
+              const pMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 1 })
+              const pMesh = new THREE.Mesh(pGeo, pMat)
+              pMesh.position.set(
+                currentPos.x + (Math.random() - 0.5) * 0.015,
+                currentPos.y + (Math.random() - 0.5) * 0.015,
+                currentPos.z + (Math.random() - 0.5) * 0.015,
+              )
+              scene.add(pMesh)
+              particles.push({ mesh: pMesh, mat: pMat, age: 0 })
+            }
+
+            // Age particles — shrink and fade, remove at 20 frames
+            for (let p = particles.length - 1; p >= 0; p--) {
+              const particle = particles[p]
+              particle.age++
+              const life = particle.age / 20
+              particle.mat.opacity = 1 - life
+              particle.mesh.scale.setScalar(1 - life * 0.8)
+              if (particle.age >= 20) {
+                scene.remove(particle.mesh)
+                particle.mat.dispose()
+                particles.splice(p, 1)
+              }
+            }
 
             if (t < 1) return true
 
-            // ── Clean up missile ──────────────────────────────────
-            scene.remove(sprite); tex.dispose(); spriteMat.dispose()
-            scene.remove(trail);  trailGeo.dispose(); trailMat.dispose()
+            // ── Clean up missile + trail ────────────────────────────────
+            scene.remove(missileMesh); missileGeo.dispose(); missileMat.dispose()
+            scene.remove(trail);       trailGeo.dispose();   trailMat.dispose()
+            // Drain remaining particles, then dispose shared geometry
+            particles.forEach(({ mesh, mat }) => { scene.remove(mesh); mat.dispose() })
+            particles.length = 0
+            pGeo.dispose()
 
-            // ── Notify impact (for sound) ─────────────────────────
+            // ── Notify impact ───────────────────────────────────────────
             onImpactRef.current?.()
 
-            // ── Flash PointLight ──────────────────────────────────
+            // ── Flash ───────────────────────────────────────────────────
             const flash = new THREE.PointLight(0xff2233, 3, 2)
             flash.position.copy(to)
             scene.add(flash)
             setTimeout(() => scene.remove(flash), 300)
 
-            // ── Impact ring (direct RAF — animsRef push gets overwritten) ──
+            // ── Impact ring (direct RAF) ────────────────────────────────
             const rGeo = new THREE.RingGeometry(0.015, 0.04, 32)
             const rMat = new THREE.MeshBasicMaterial({
               color: 0xff2233, transparent: true, opacity: 0.9, side: THREE.DoubleSide,
@@ -326,17 +337,14 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             const ringStart = Date.now()
             const animateRing = () => {
               const progress = (Date.now() - ringStart) / 500
-              if (progress >= 1) {
-                scene.remove(ring); rGeo.dispose(); rMat.dispose()
-                return
-              }
+              if (progress >= 1) { scene.remove(ring); rGeo.dispose(); rMat.dispose(); return }
               ring.scale.set(progress * 3, progress * 3, 1)
               rMat.opacity = 1 - progress
               requestAnimationFrame(animateRing)
             }
             animateRing()
 
-            // ── Camera shake (direct RAF) ─────────────────────────
+            // ── Camera shake (direct RAF) ────────────────────────────────
             const camera = cameraRef.current
             if (camera) {
               const originalPos = camera.position.clone()

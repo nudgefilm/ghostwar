@@ -24,24 +24,30 @@ export const SoundEngine = {
   playImpact() {
     const ctx = this.ctx
     if (!ctx) return
-    const bufferSize = ctx.sampleRate * 0.5
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-    const data = buffer.getChannelData(0)
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 2)
-    }
-    const source = ctx.createBufferSource()
+    // Low-frequency thud
+    const osc = ctx.createOscillator()
     const gain = ctx.createGain()
-    const filter = ctx.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.frequency.value = 150
-    source.buffer = buffer
-    source.connect(filter)
-    filter.connect(gain)
+    osc.connect(gain)
     gain.connect(ctx.destination)
-    gain.gain.setValueAtTime(1.5, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
-    source.start()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(120, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.4)
+    gain.gain.setValueAtTime(0.8, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+    osc.start()
+    osc.stop(ctx.currentTime + 0.4)
+    // High crack
+    const osc2 = ctx.createOscillator()
+    const gain2 = ctx.createGain()
+    osc2.connect(gain2)
+    gain2.connect(ctx.destination)
+    osc2.type = 'sawtooth'
+    osc2.frequency.setValueAtTime(300, ctx.currentTime)
+    osc2.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.2)
+    gain2.gain.setValueAtTime(0.4, ctx.currentTime)
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2)
+    osc2.start()
+    osc2.stop(ctx.currentTime + 0.2)
   },
 
   playAlert() {
