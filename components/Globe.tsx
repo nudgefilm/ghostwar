@@ -138,7 +138,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         new THREE.MeshBasicMaterial({
           color: 0x00ff88,
           transparent: true,
-          opacity: 0.06,
+          opacity: 0.03,
           side: THREE.BackSide,
         }),
       ),
@@ -149,8 +149,8 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS, 64, 64),
         new THREE.MeshPhongMaterial({
-          color: 0x002b15,
-          opacity: 0.65,
+          color: 0x001208,
+          opacity: 0.85,
           transparent: true,
           shininess: 30,
         }),
@@ -166,7 +166,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     )
 
     // Graticule — lat/lon grid every 30°
-    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.15, transparent: true })
+    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.05, transparent: true })
     ;[-60, -30, 0, 30, 60].forEach(lat => {
       const pts = Array.from({ length: 65 }, (_, i) =>
         latLngToVec3(lat, (i / 64) * 360 - 180, RADIUS + 0.002),
@@ -190,15 +190,21 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controls.maxDistance = 5
     controlsRef.current = controls
 
-    // GeoJSON continent lines
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
+    // GeoJSON continent lines — per-ring materials for dynamic front/back opacity
+    const contLines: { mat: THREE.LineBasicMaterial; normal: THREE.Vector3 }[] = []
     fetch('/ne_110m_land.json')
       .then(r => r.json())
       .then((data: { features: GeoFeature[] }) => {
         const addRing = (ring: number[][]) => {
           if (ring.length < 2) return
           const pts = ring.map(([lng, lat]) => latLngToVec3(lat, lng, RADIUS + 0.001))
-          scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat))
+          // Centroid of ring points, normalized = outward sphere normal at ring center
+          const centroid = new THREE.Vector3()
+          for (const p of pts) centroid.add(p)
+          const normal = centroid.divideScalar(pts.length).normalize()
+          const mat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
+          scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat))
+          contLines.push({ mat, normal })
         }
         for (const { geometry } of data.features) {
           if (geometry.type === 'Polygon') {
@@ -209,6 +215,17 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         }
       })
       .catch(() => {})
+
+    // Update continent line opacity each frame: front-facing=0.6, back-facing=0.15
+    animsRef.current.push((): boolean => {
+      const cam = cameraRef.current
+      if (!cam || contLines.length === 0) return true
+      const camDir = cam.position.clone().normalize()
+      for (const { mat, normal } of contLines) {
+        mat.opacity = normal.dot(camDir) >= 0 ? 0.6 : 0.15
+      }
+      return true
+    })
 
     // ── InstancedMesh for all missiles ──────────────────────────────────
     // Outer body: thin sleek bar
