@@ -119,7 +119,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     sceneRef.current = scene
 
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100)
-    camera.position.z = 3.2
+    camera.position.z = 2.5
     cameraRef.current = camera
 
     // Lighting
@@ -131,37 +131,37 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     pl2.position.set(2, -2, -1)
     scene.add(pl2)
 
-    // Atmosphere glow — outer rim only, slightly more visible for globe outline
+    // Atmosphere glow — subtle outer rim
     scene.add(
       new THREE.Mesh(
-        new THREE.SphereGeometry(RADIUS * 1.015, 64, 64),
+        new THREE.SphereGeometry(RADIUS * 1.02, 32, 32),
         new THREE.MeshBasicMaterial({
           color: 0x00ff88,
           transparent: true,
-          opacity: 0.12,
+          opacity: 0.05,
           side: THREE.BackSide,
         }),
       ),
     )
 
-    // Base sphere — fully transparent background
+    // Base sphere — dark background to prevent bloom bleed
     scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS, 64, 64),
         new THREE.MeshPhongMaterial({
           color: 0x001a0d,
-          opacity: 0,
+          opacity: 0.55,
           transparent: true,
-          shininess: 0,
+          shininess: 30,
         }),
       ),
     )
 
-    // Wireframe overlay — very faint, barely visible
+    // Wireframe overlay — very faint
     scene.add(
       new THREE.LineSegments(
         new THREE.WireframeGeometry(new THREE.SphereGeometry(RADIUS, 32, 32)),
-        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.06, transparent: true }),
+        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.08, transparent: true }),
       ),
     )
 
@@ -188,7 +188,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controls.dampingFactor = 0.05
     controls.minDistance = 1.5
     controls.maxDistance = 5
-    controls.target.set(0, 0.1, 0)
+    controls.target.set(0, 0.18, 0)
     controlsRef.current = controls
 
     // GeoJSON continent lines — per-ring materials for dynamic front/back opacity
