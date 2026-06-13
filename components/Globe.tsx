@@ -119,7 +119,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     sceneRef.current = scene
 
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100)
-    camera.position.z = 2.5
+    camera.position.z = 2.8
     cameraRef.current = camera
 
     // Lighting
@@ -131,42 +131,42 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     pl2.position.set(2, -2, -1)
     scene.add(pl2)
 
-    // Atmosphere glow — subtle outer rim
+    // Atmosphere glow
     scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS * 1.02, 32, 32),
         new THREE.MeshBasicMaterial({
           color: 0x00ff88,
           transparent: true,
-          opacity: 0.05,
+          opacity: 0.06,
           side: THREE.BackSide,
         }),
       ),
     )
 
-    // Base sphere — dark background to prevent bloom bleed
+    // Base sphere
     scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS, 64, 64),
         new THREE.MeshPhongMaterial({
-          color: 0x001a0d,
-          opacity: 0.55,
+          color: 0x002b15,
+          opacity: 0.65,
           transparent: true,
           shininess: 30,
         }),
       ),
     )
 
-    // Wireframe overlay — very faint
+    // Wireframe overlay
     scene.add(
       new THREE.LineSegments(
         new THREE.WireframeGeometry(new THREE.SphereGeometry(RADIUS, 32, 32)),
-        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.08, transparent: true }),
+        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.4, transparent: true }),
       ),
     )
 
     // Graticule — lat/lon grid every 30°
-    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.06, transparent: true })
+    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.15, transparent: true })
     ;[-60, -30, 0, 30, 60].forEach(lat => {
       const pts = Array.from({ length: 65 }, (_, i) =>
         latLngToVec3(lat, (i / 64) * 360 - 180, RADIUS + 0.002),
@@ -188,24 +188,17 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controls.dampingFactor = 0.05
     controls.minDistance = 1.5
     controls.maxDistance = 5
-    controls.target.set(0, 0.18, 0)
     controlsRef.current = controls
 
-    // GeoJSON continent lines — per-ring materials for dynamic front/back opacity
-    const contLines: { mat: THREE.LineBasicMaterial; normal: THREE.Vector3 }[] = []
+    // GeoJSON continent lines
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
     fetch('/ne_110m_land.json')
       .then(r => r.json())
       .then((data: { features: GeoFeature[] }) => {
         const addRing = (ring: number[][]) => {
           if (ring.length < 2) return
           const pts = ring.map(([lng, lat]) => latLngToVec3(lat, lng, RADIUS + 0.001))
-          // Centroid of ring points, normalized = outward sphere normal at ring center
-          const centroid = new THREE.Vector3()
-          for (const p of pts) centroid.add(p)
-          const normal = centroid.divideScalar(pts.length).normalize()
-          const mat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
-          scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat))
-          contLines.push({ mat, normal })
+          scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat))
         }
         for (const { geometry } of data.features) {
           if (geometry.type === 'Polygon') {
@@ -216,17 +209,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         }
       })
       .catch(() => {})
-
-    // Update continent line opacity each frame: front-facing=0.6, back-facing=0.15
-    animsRef.current.push((): boolean => {
-      const cam = cameraRef.current
-      if (!cam || contLines.length === 0) return true
-      const camDir = cam.position.clone().normalize()
-      for (const { mat, normal } of contLines) {
-        mat.opacity = normal.dot(camDir) >= 0 ? 0.6 : 0.15
-      }
-      return true
-    })
 
     // ── InstancedMesh for all missiles ──────────────────────────────────
     // Outer body: thin sleek bar
