@@ -131,42 +131,42 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     pl2.position.set(2, -2, -1)
     scene.add(pl2)
 
-    // Atmosphere glow
+    // Atmosphere glow — outer rim only, slightly more visible for globe outline
     scene.add(
       new THREE.Mesh(
-        new THREE.SphereGeometry(RADIUS * 1.02, 32, 32),
+        new THREE.SphereGeometry(RADIUS * 1.015, 64, 64),
         new THREE.MeshBasicMaterial({
           color: 0x00ff88,
           transparent: true,
-          opacity: 0.06,
+          opacity: 0.12,
           side: THREE.BackSide,
         }),
       ),
     )
 
-    // Base sphere
+    // Base sphere — fully transparent background
     scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS, 64, 64),
         new THREE.MeshPhongMaterial({
           color: 0x001a0d,
-          opacity: 0.6,
+          opacity: 0,
           transparent: true,
-          shininess: 30,
+          shininess: 0,
         }),
       ),
     )
 
-    // Wireframe overlay
+    // Wireframe overlay — very faint, barely visible
     scene.add(
       new THREE.LineSegments(
         new THREE.WireframeGeometry(new THREE.SphereGeometry(RADIUS, 32, 32)),
-        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.4, transparent: true }),
+        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.06, transparent: true }),
       ),
     )
 
     // Graticule — lat/lon grid every 30°
-    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.15, transparent: true })
+    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.06, transparent: true })
     ;[-60, -30, 0, 30, 60].forEach(lat => {
       const pts = Array.from({ length: 65 }, (_, i) =>
         latLngToVec3(lat, (i / 64) * 360 - 180, RADIUS + 0.002),
