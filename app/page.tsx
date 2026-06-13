@@ -173,6 +173,15 @@ export default function Home() {
     launchingRef.current = true
     setIsLaunching(true)
 
+    // Fly to player's country so they see the launch origin
+    const fromCoords = COUNTRY_COORDS[player.country_code]
+    if (fromCoords) {
+      globeRef.current?.flyTo(fromCoords[0], fromCoords[1], 1200)
+    }
+
+    // Wait for flyTo animation to finish before firing
+    await new Promise<void>(resolve => setTimeout(resolve, 1500))
+
     if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
     else SoundEngine.playLaunch()
 
@@ -198,7 +207,6 @@ export default function Home() {
       }
 
       if (data.success && data.flight_seconds) {
-        const fromCoords = COUNTRY_COORDS[player.country_code]
         const toCoords = COUNTRY_COORDS[targetCountry]
         if (fromCoords && toCoords) {
           globeRef.current?.launchMissile(

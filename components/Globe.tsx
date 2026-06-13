@@ -228,21 +228,26 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
   }, [])
 
   useImperativeHandle(ref, () => ({
-    flyTo(lat, lng, duration = 1500) {
+    flyTo(lat, lng, duration = 1200) {
       const camera = cameraRef.current
       const controls = controlsRef.current
       if (!camera) return
 
       const dist = camera.position.length()
-      const target = latLngToVec3(lat, lng, dist)
-      const start = camera.position.clone()
+      const startDir = camera.position.clone().normalize()
+      const endDir = latLngToVec3(lat, lng).normalize()
+
+      // Quaternion SLERP: rotate around globe surface, not through it
+      const rotQ = new THREE.Quaternion().setFromUnitVectors(startDir, endDir)
+      const idQ = new THREE.Quaternion()
       const t0 = performance.now()
 
       if (controls) controls.autoRotate = false
 
       const tick = (now: number) => {
         const t = Math.min((now - t0) / duration, 1)
-        camera.position.lerpVectors(start, target, easeInOutCubic(t))
+        const q = idQ.clone().slerp(rotQ, easeInOutCubic(t))
+        camera.position.copy(startDir.clone().applyQuaternion(q).multiplyScalar(dist))
         if (t < 1) {
           requestAnimationFrame(tick)
         } else {
