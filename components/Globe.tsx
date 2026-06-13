@@ -286,12 +286,18 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
           scene.add(head)
           scene.add(headLight)
 
-          // ── Persistent trail line ──────────────────────────────────────
-          const trailGeo = new THREE.BufferGeometry()
-          const trailMat = new THREE.LineBasicMaterial({ color: 0xFF2233, transparent: true, opacity: 0.4 })
-          const trailLine = new THREE.Line(trailGeo, trailMat)
-          scene.add(trailLine)
-          const visitedPts: THREE.Vector3[] = []
+          // ── History trail line — last 30 positions, orange→black fade ──
+          const HISTORY_SIZE = 30
+          const historyPts: THREE.Vector3[] = []
+          const histPositions = new Float32Array(HISTORY_SIZE * 3)
+          const histColors = new Float32Array(HISTORY_SIZE * 3)
+          const histGeo = new THREE.BufferGeometry()
+          histGeo.setAttribute('position', new THREE.BufferAttribute(histPositions, 3))
+          histGeo.setAttribute('color', new THREE.BufferAttribute(histColors, 3))
+          histGeo.setDrawRange(0, 0)
+          const histMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })
+          const histLine = new THREE.Line(histGeo, histMat)
+          scene.add(histLine)
 
           // ── Particle pool — shared base geometry ───────────────────────
           const pBaseGeo = new THREE.SphereGeometry(0.01, 4, 4)
@@ -315,26 +321,27 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             particles.push({ mesh, mat, life: 0, maxLife, velocity: vel, startSize, endSize, startOpacity, endOpacity: 0, gravity })
           }
 
+          const fireExhaustColors = [0xFFFFFF, 0xFFAA00, 0xFF4400]
           const spawnFlight = (pos: THREE.Vector3, travelDir: THREE.Vector3) => {
-            // 5 fire particles: velocity = -dir*0.02 ±0.005 spread
-            for (let p = 0; p < 5; p++) {
-              const sz = 0.008 + Math.random() * 0.007
+            // 4 fire particles: bright, short-lived, fast backward
+            for (let p = 0; p < 4; p++) {
+              const sz = 0.006 + Math.random() * 0.004
               const vel = new THREE.Vector3(
-                -travelDir.x * 0.02 + (Math.random() - 0.5) * 0.005,
-                -travelDir.y * 0.02 + (Math.random() - 0.5) * 0.005,
-                -travelDir.z * 0.02 + (Math.random() - 0.5) * 0.005,
+                -travelDir.x * 0.025 + (Math.random() - 0.5) * 0.003,
+                -travelDir.y * 0.025 + (Math.random() - 0.5) * 0.003,
+                -travelDir.z * 0.025 + (Math.random() - 0.5) * 0.003,
               )
-              addParticle(pos, vel, fireColors[Math.floor(Math.random() * 4)], 15, sz, 0, 1)
+              addParticle(pos.clone(), vel, fireExhaustColors[Math.floor(Math.random() * 3)], 12, sz, 0, 1)
             }
-            // 3 smoke particles, offset behind head
+            // 3 smoke particles: slower velocity + longer life = visible trail length
             for (let p = 0; p < 3; p++) {
-              const smokePos = pos.clone().sub(travelDir.clone().multiplyScalar(0.015 + Math.random() * 0.01))
+              const smokePos = pos.clone().sub(travelDir.clone().multiplyScalar(0.02))
               const vel = new THREE.Vector3(
-                -travelDir.x * 0.02 + (Math.random() - 0.5) * 0.005,
-                -travelDir.y * 0.02 + (Math.random() - 0.5) * 0.005,
-                -travelDir.z * 0.02 + (Math.random() - 0.5) * 0.005,
+                -travelDir.x * 0.018 + (Math.random() - 0.5) * 0.008,
+                -travelDir.y * 0.018 + (Math.random() - 0.5) * 0.008,
+                -travelDir.z * 0.018 + (Math.random() - 0.5) * 0.008,
               )
-              addParticle(smokePos, vel, 0x666666, 30, 0.01, 0.03, 0.5)
+              addParticle(smokePos, vel, Math.random() < 0.5 ? 0xAAAAAA : 0x555555, 40, 0.008, 0.025, 0.7)
             }
           }
 
@@ -354,8 +361,22 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
               if (t < 1) {
                 head.position.copy(currentPos)
                 headLight.position.copy(currentPos)
-                visitedPts.push(currentPos.clone())
-                if (visitedPts.length >= 2) trailGeo.setFromPoints(visitedPts)
+                // Update history trail: sliding window of 30 points, orange head → black tail
+                historyPts.push(currentPos.clone())
+                if (historyPts.length > HISTORY_SIZE) historyPts.shift()
+                const hn = historyPts.length
+                for (let h = 0; h < hn; h++) {
+                  const ratio = hn > 1 ? h / (hn - 1) : 1
+                  histPositions[h * 3]     = historyPts[h].x
+                  histPositions[h * 3 + 1] = historyPts[h].y
+                  histPositions[h * 3 + 2] = historyPts[h].z
+                  histColors[h * 3]     = ratio * 1.0
+                  histColors[h * 3 + 1] = ratio * 0.4
+                  histColors[h * 3 + 2] = 0
+                }
+                histGeo.setDrawRange(0, hn)
+                histGeo.attributes.position.needsUpdate = true
+                histGeo.attributes.color.needsUpdate = true
                 spawnFlight(currentPos, travelDir)
               } else {
                 // ── IMPACT ─────────────────────────────────────────────────
@@ -464,13 +485,13 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
                 }
                 requestAnimationFrame(animScorch)
 
-                // 5. Fade trail line over 3s then remove
+                // 5. Fade history trail over 2s then remove
                 const trailT0 = performance.now()
                 const animTrail = () => {
-                  const tp = Math.min((performance.now() - trailT0) / 3000, 1)
-                  trailMat.opacity = 0.4 * (1 - tp)
+                  const tp = Math.min((performance.now() - trailT0) / 2000, 1)
+                  histMat.opacity = 0.9 * (1 - tp)
                   if (tp < 1) requestAnimationFrame(animTrail)
-                  else { scene.remove(trailLine); trailGeo.dispose(); trailMat.dispose() }
+                  else { scene.remove(histLine); histGeo.dispose(); histMat.dispose() }
                 }
                 requestAnimationFrame(animTrail)
 
