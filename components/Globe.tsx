@@ -113,7 +113,7 @@ const Globe = forwardRef<GlobeHandle>((_, ref) => {
     // GeoJSON continent lines
     const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
 
-    fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_land.json')
+    fetch('/ne_110m_land.json')
       .then(r => r.json())
       .then((data: { features: GeoFeature[] }) => {
         const addRing = (ring: number[][]) => {
