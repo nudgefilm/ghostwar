@@ -210,7 +210,6 @@ export default function Home() {
           // Sound + missile appear in the same frame
           if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
           else SoundEngine.playLaunch()
-          SoundEngine.playFlight(data.flight_seconds * 1000)
           globeRef.current?.launchMissile(
             fromCoords[0], fromCoords[1],
             toCoords[0], toCoords[1],

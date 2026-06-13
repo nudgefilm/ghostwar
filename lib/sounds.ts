@@ -93,32 +93,6 @@ export const SoundEngine = {
     rumble.start(t); rumble.stop(t + 2.0)
   },
 
-  playFlight(flightMs: number) {
-    const ctx = this.ctx
-    if (!ctx) return
-    const t = ctx.currentTime
-    const dur = Math.max(1.5, flightMs / 1000)
-    const bufSize = ctx.sampleRate * 4
-    const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate)
-    const data = buffer.getChannelData(0)
-    for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1
-    const src = ctx.createBufferSource()
-    src.buffer = buffer
-    src.loop = true
-    const filter = ctx.createBiquadFilter()
-    filter.type = 'bandpass'
-    filter.frequency.value = 620
-    filter.Q.value = 1.8
-    const gain = ctx.createGain()
-    gain.gain.setValueAtTime(0, t)
-    gain.gain.linearRampToValueAtTime(0.28, t + 0.5)
-    gain.gain.setValueAtTime(0.28, t + dur - 0.8)
-    gain.gain.exponentialRampToValueAtTime(0.001, t + dur)
-    src.connect(filter); filter.connect(gain); gain.connect(ctx.destination)
-    src.start(t)
-    src.stop(t + dur)
-  },
-
   playImpact() {
     const ctx = this.ctx
     if (!ctx) return
