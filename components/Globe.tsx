@@ -184,10 +184,11 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controls.dampingFactor = 0.05
     controls.minDistance = 1.5
     controls.maxDistance = 5
+    controls.target.set(0, 0.12, 0)
     controlsRef.current = controls
 
     // GeoJSON continent lines
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.66, transparent: true })
     fetch('/ne_110m_land.json')
       .then(r => r.json())
       .then((data: { features: GeoFeature[] }) => {
