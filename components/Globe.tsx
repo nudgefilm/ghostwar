@@ -3,11 +3,15 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 
 const RADIUS = 1
 const MAX_MISSILES = 20
 const PATH_COUNT = 100
-const TRAIL_SIZE = 15
+const TRAIL_SIZE = 25
 
 function latLngToVec3(lat: number, lng: number, r = RADIUS): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180)
@@ -95,6 +99,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
   useEffect(() => { onImpactRef.current = onImpact }, [onImpact])
 
   const missileInstancesRef = useRef<THREE.InstancedMesh | null>(null)
+  const missileCoreInstancesRef = useRef<THREE.InstancedMesh | null>(null)
   const activeMissilesRef = useRef<MissileState[]>([])
   const freeSlotsRef = useRef<number[]>([])
 
@@ -206,11 +211,12 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       .catch(() => {})
 
     // ── InstancedMesh for all missiles ──────────────────────────────────
-    const missileGeo = new THREE.PlaneGeometry(0.008, 0.06)
+    // Outer body: thin sleek bar
+    const missileGeo = new THREE.PlaneGeometry(0.003, 0.015)
     const missileMat = new THREE.MeshBasicMaterial({
-      color: 0xFF4400,
+      color: 0xFF6600,
       transparent: true,
-      opacity: 0.9,
+      opacity: 1.0,
       side: THREE.DoubleSide,
       depthWrite: false,
     })
@@ -225,6 +231,24 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     missileInstances.instanceMatrix.needsUpdate = true
     scene.add(missileInstances)
     missileInstancesRef.current = missileInstances
+
+    // White-hot core: narrower, shorter bar layered on top
+    const coreGeo = new THREE.PlaneGeometry(0.001, 0.007)
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: 0xFFFFFF,
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const coreInstances = new THREE.InstancedMesh(coreGeo, coreMat, MAX_MISSILES)
+    coreInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    for (let si = 0; si < MAX_MISSILES; si++) {
+      coreInstances.setMatrixAt(si, zeroScaleM)
+    }
+    coreInstances.instanceMatrix.needsUpdate = true
+    scene.add(coreInstances)
+    missileCoreInstancesRef.current = coreInstances
 
     // ── Explosion trigger ────────────────────────────────────────────────
     const debrisColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFCC00, 0xFF2233]
@@ -382,13 +406,25 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       }
     }
 
+    // EffectComposer with bloom
+    const composer = new EffectComposer(renderer)
+    composer.addPass(new RenderPass(scene, camera))
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(w, h),
+      1.8,   // strength
+      0.4,   // radius
+      0.1,   // threshold — low value = more things bloom
+    )
+    composer.addPass(bloomPass)
+    composer.addPass(new OutputPass())
+
     // Render loop
     let animId: number
     const loop = () => {
       animId = requestAnimationFrame(loop)
       controls.update()
       animsRef.current = animsRef.current.filter(fn => fn())
-      renderer.render(scene, camera)
+      composer.render()
     }
     loop()
 
@@ -401,6 +437,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
     animsRef.current.push((): boolean => {
       const instances = missileInstancesRef.current
+      const coreInstances = missileCoreInstancesRef.current
       if (!instances) return true
 
       const now = Date.now()
@@ -416,7 +453,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         const dir = dirVec.lengthSq() > 1e-8 ? dirVec.normalize() : currentPos.clone().normalize()
 
         if (progress < 1) {
-          // Orient plane to face direction of travel
+          // Orient both planes to face direction of travel
           const cosA = upVec.dot(dir)
           if (cosA < -0.9999) {
             tmpQ.setFromAxisAngle(axisX, Math.PI)
@@ -425,27 +462,44 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
           }
           tmpMatrix.compose(currentPos, tmpQ, tmpScale)
           instances.setMatrixAt(m.instanceId, tmpMatrix)
+          if (coreInstances) coreInstances.setMatrixAt(m.instanceId, tmpMatrix)
           dirty = true
 
-          // Sliding trail: newest at index 0, oldest at tail
+          // Sliding trail: newest at 0, oldest at tail
+          // Color gradient: white (head) → orange → red → black (tail)
           m.trailHistory.unshift(currentPos.clone())
           if (m.trailHistory.length > TRAIL_SIZE) m.trailHistory.pop()
           const hn = m.trailHistory.length
           for (let h = 0; h < hn; h++) {
-            const brightness = hn > 1 ? 1 - h / (hn - 1) : 1
+            const t = hn > 1 ? h / (hn - 1) : 0  // 0=head, 1=tail
             m.trailPositions[h * 3]     = m.trailHistory[h].x
             m.trailPositions[h * 3 + 1] = m.trailHistory[h].y
             m.trailPositions[h * 3 + 2] = m.trailHistory[h].z
-            m.trailColors[h * 3]     = brightness
-            m.trailColors[h * 3 + 1] = brightness * 0.4
-            m.trailColors[h * 3 + 2] = 0
+            // white→orange (t 0→0.3), orange→red (t 0.3→0.7), red→black (t 0.7→1)
+            if (t < 0.3) {
+              const s = t / 0.3
+              m.trailColors[h * 3]     = 1
+              m.trailColors[h * 3 + 1] = 1 - s * 0.6
+              m.trailColors[h * 3 + 2] = 1 - s
+            } else if (t < 0.7) {
+              const s = (t - 0.3) / 0.4
+              m.trailColors[h * 3]     = 1
+              m.trailColors[h * 3 + 1] = 0.4 - s * 0.27
+              m.trailColors[h * 3 + 2] = 0
+            } else {
+              const s = (t - 0.7) / 0.3
+              m.trailColors[h * 3]     = 1 - s
+              m.trailColors[h * 3 + 1] = (0.13 - s * 0.13)
+              m.trailColors[h * 3 + 2] = 0
+            }
           }
           m.trailGeo.setDrawRange(0, hn)
           m.trailGeo.attributes.position.needsUpdate = true
           m.trailGeo.attributes.color.needsUpdate = true
         } else {
-          // Impact: hide instance, return slot, trigger explosion
+          // Impact: hide both instances, return slot, trigger explosion
           instances.setMatrixAt(m.instanceId, zeroScaleM)
+          if (coreInstances) coreInstances.setMatrixAt(m.instanceId, zeroScaleM)
           dirty = true
           freeSlotsRef.current.push(m.instanceId)
           activeMissilesRef.current.splice(mi, 1)
@@ -453,7 +507,10 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         }
       }
 
-      if (dirty) instances.instanceMatrix.needsUpdate = true
+      if (dirty) {
+        instances.instanceMatrix.needsUpdate = true
+        if (coreInstances) coreInstances.instanceMatrix.needsUpdate = true
+      }
       return true
     })
 
@@ -463,6 +520,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       camera.aspect = nw / nh
       camera.updateProjectionMatrix()
       renderer.setSize(nw, nh)
+      composer.setSize(nw, nh)
     }
     window.addEventListener('resize', onResize)
 
