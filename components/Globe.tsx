@@ -16,8 +16,96 @@ function latLngToVec3(lat: number, lng: number, r = RADIUS): THREE.Vector3 {
   )
 }
 
+function getMissilePoint(
+  fromLat: number, fromLng: number,
+  toLat: number, toLng: number,
+  t: number,
+  arcHeight = 0.4,
+): THREE.Vector3 {
+  const startNorm = latLngToVec3(fromLat, fromLng).normalize()
+  const endNorm   = latLngToVec3(toLat, toLng).normalize()
+  // Approximate SLERP: lerp then normalize keeps the path on the sphere
+  const slerped = startNorm.clone().lerp(endNorm, t)
+  if (slerped.lengthSq() < 1e-8) {
+    // Near-antipodal fallback: use a perpendicular at the midpoint
+    return startNorm.clone().cross(new THREE.Vector3(0, 1, 0)).normalize()
+      .multiplyScalar(RADIUS + arcHeight)
+  }
+  slerped.normalize()
+  const arc = Math.sin(Math.PI * t) * arcHeight
+  return slerped.multiplyScalar(RADIUS + arc)
+}
+
 function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+}
+
+interface MissileParticle {
+  sprite: THREE.Sprite
+  mat: THREE.SpriteMaterial
+  age: number
+  maxAge: number
+  kind: 'fire' | 'smoke'
+  velocity: THREE.Vector3
+  baseSize: number
+}
+
+function createMissileTexture(isNuke = false): THREE.CanvasTexture {
+  const canvas = document.createElement('canvas')
+  canvas.width = 64
+  canvas.height = 128
+  const ctx = canvas.getContext('2d')!
+
+  // Main body — metallic gradient cylinder
+  const bodyGrad = ctx.createLinearGradient(0, 0, 64, 0)
+  bodyGrad.addColorStop(0, '#888888')
+  bodyGrad.addColorStop(0.3, '#FFFFFF')
+  bodyGrad.addColorStop(0.7, '#DDDDDD')
+  bodyGrad.addColorStop(1, '#666666')
+  ctx.fillStyle = bodyGrad
+  ctx.fillRect(12, 20, 40, 80)
+
+  // Nose cone
+  ctx.fillStyle = '#CCCCCC'
+  ctx.beginPath()
+  ctx.moveTo(32, 0)
+  ctx.lineTo(52, 20)
+  ctx.lineTo(12, 20)
+  ctx.closePath()
+  ctx.fill()
+
+  // Wide red stripe
+  ctx.fillStyle = '#FF2233'
+  ctx.fillRect(12, 52, 40, 8)
+
+  // Thin red stripe
+  ctx.fillStyle = '#FF2233'
+  ctx.fillRect(12, 38, 40, 3)
+
+  // Fins
+  ctx.fillStyle = '#AAAAAA'
+  ctx.beginPath()
+  ctx.moveTo(12, 80); ctx.lineTo(0, 110); ctx.lineTo(12, 105)
+  ctx.closePath()
+  ctx.fill()
+  ctx.beginPath()
+  ctx.moveTo(52, 80); ctx.lineTo(64, 110); ctx.lineTo(52, 105)
+  ctx.closePath()
+  ctx.fill()
+
+  // Exhaust nozzle
+  ctx.fillStyle = '#444444'
+  ctx.fillRect(18, 100, 28, 10)
+
+  // Nuke variant: darken body, orange stripe
+  if (isNuke) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    ctx.fillRect(12, 20, 40, 80)
+    ctx.fillStyle = '#FF8800'
+    ctx.fillRect(12, 52, 40, 8)
+  }
+
+  return new THREE.CanvasTexture(canvas)
 }
 
 export interface GlobeHandle {
@@ -224,82 +312,115 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const scene = sceneRef.current
       if (!scene) return
 
-      const missileColor = type === 'nuke' ? 0xff6600 : 0xff4444
-      const yAxis = new THREE.Vector3(0, 1, 0)
+      const isNuke = type === 'nuke'
+      const spriteW = isNuke ? 0.08 : 0.06
+      const spriteH = isNuke ? 0.2 : 0.15
+
+      // Pre-compute 101 SLERP path points (shared across all staggered missiles)
+      const PATH_COUNT = 100
+      const pathPoints: THREE.Vector3[] = []
+      for (let pi = 0; pi <= PATH_COUNT; pi++) {
+        pathPoints.push(getMissilePoint(fromLat, fromLng, toLat, toLng, pi / PATH_COUNT))
+      }
+      const impactPoint = pathPoints[PATH_COUNT]
+
+      // Canvas texture shared across quantity, ref-counted for disposal
+      const missileTex = createMissileTexture(isNuke)
+      let texRefCount = quantity
 
       for (let i = 0; i < quantity; i++) {
         setTimeout(() => {
-          const from = latLngToVec3(fromLat, fromLng, RADIUS + 0.01)
-          const to   = latLngToVec3(toLat,   toLng,   RADIUS + 0.01)
-          const mid  = new THREE.Vector3()
-            .addVectors(from, to)
-            .multiplyScalar(0.5)
-            .normalize()
-            .multiplyScalar(RADIUS * 1.4)
-          const curve = new THREE.QuadraticBezierCurve3(from, mid, to)
+          // ── Sprite missile ────────────────────────────────────────────
+          const spriteMat = new THREE.SpriteMaterial({ map: missileTex, transparent: true })
+          const missileSprite = new THREE.Sprite(spriteMat)
+          missileSprite.scale.set(spriteW, spriteH, 1)
+          scene.add(missileSprite)
 
-          // ── Trail — rebuilt each frame from visited points ─────────────
-          const visitedPoints: THREE.Vector3[] = []
-          const trailGeo = new THREE.BufferGeometry()
-          const trailMat = new THREE.LineBasicMaterial({ color: 0xff2233, transparent: true, opacity: 0.8 })
-          const trail = new THREE.Line(trailGeo, trailMat)
-          scene.add(trail)
+          const particles: MissileParticle[] = []
 
-          // ── Cone missile (ConeGeometry, tip at +Y, oriented via quaternion) ─
-          const missileGeo = new THREE.ConeGeometry(0.012, 0.05, 6)
-          const missileMat = new THREE.MeshBasicMaterial({ color: missileColor })
-          const missileMesh = new THREE.Mesh(missileGeo, missileMat)
-          scene.add(missileMesh)
+          const spawnExhaust = (tailPos: THREE.Vector3, travelDir: THREE.Vector3) => {
+            // Fire: 4 per frame — orange→red, 12-frame life
+            for (let p = 0; p < 4; p++) {
+              const sz = 0.01 + Math.random() * 0.01
+              const pMat = new THREE.SpriteMaterial({ color: 0xff6600, transparent: true, opacity: 1 })
+              const pSprite = new THREE.Sprite(pMat)
+              pSprite.scale.set(sz, sz, 1)
+              pSprite.position.set(
+                tailPos.x + (Math.random() - 0.5) * 0.01,
+                tailPos.y + (Math.random() - 0.5) * 0.01,
+                tailPos.z + (Math.random() - 0.5) * 0.01,
+              )
+              const vel = travelDir.clone().negate().multiplyScalar(0.003).add(
+                new THREE.Vector3((Math.random()-0.5)*0.002, (Math.random()-0.5)*0.002, (Math.random()-0.5)*0.002),
+              )
+              scene.add(pSprite)
+              particles.push({ sprite: pSprite, mat: pMat, age: 0, maxAge: 12, kind: 'fire', velocity: vel, baseSize: sz })
+            }
+            // Smoke: 2 per frame — gray, grows, 20-frame life
+            for (let p = 0; p < 2; p++) {
+              const sz = 0.015 + Math.random() * 0.015
+              const pMat = new THREE.SpriteMaterial({ color: 0x444444, transparent: true, opacity: 0.6 })
+              const pSprite = new THREE.Sprite(pMat)
+              pSprite.scale.set(sz, sz, 1)
+              const smokePos = tailPos.clone().sub(travelDir.clone().multiplyScalar(spriteH * 0.15))
+              pSprite.position.set(
+                smokePos.x + (Math.random() - 0.5) * 0.015,
+                smokePos.y + (Math.random() - 0.5) * 0.015,
+                smokePos.z + (Math.random() - 0.5) * 0.015,
+              )
+              const vel = travelDir.clone().negate().multiplyScalar(0.001)
+              scene.add(pSprite)
+              particles.push({ sprite: pSprite, mat: pMat, age: 0, maxAge: 20, kind: 'smoke', velocity: vel, baseSize: sz })
+            }
+          }
 
-          // ── Exhaust particles (shared geometry, individual materials) ───
-          const pGeo = new THREE.SphereGeometry(0.008, 3, 3)
-          const particles: Array<{ mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; age: number }> = []
-
-          const orientQ = new THREE.Quaternion()
           const t0 = performance.now()
 
           const anim: AnimFn = () => {
+            const camera = cameraRef.current
             const t = Math.min((performance.now() - t0) / duration, 1)
-            const currentPos = curve.getPoint(t)
+            const idx = Math.min(Math.floor(t * PATH_COUNT), PATH_COUNT - 1)
+            const currentPos = pathPoints[idx]
+            const nextPos = pathPoints[Math.min(idx + 1, PATH_COUNT)]
 
-            // Position and orient cone toward direction of travel
-            missileMesh.position.copy(currentPos)
-            if (t < 0.99) {
-              const nextPos = curve.getPoint(Math.min(t + 0.01, 1))
-              const dir = nextPos.clone().sub(currentPos).normalize()
-              orientQ.setFromUnitVectors(yAxis, dir)
-              missileMesh.quaternion.copy(orientQ)
+            // Direction of travel
+            const dirVec = nextPos.clone().sub(currentPos)
+            const travelDir = dirVec.lengthSq() > 1e-8
+              ? dirVec.normalize()
+              : currentPos.clone().normalize()
+
+            // Position sprite
+            missileSprite.position.copy(currentPos)
+
+            // Orient sprite: rotate material so nose aligns with travel direction in screen space
+            if (camera) {
+              const camDir = travelDir.clone().transformDirection(camera.matrixWorldInverse)
+              spriteMat.rotation = Math.atan2(-camDir.x, camDir.y)
             }
 
-            // Rebuild trail from all visited positions
-            visitedPoints.push(currentPos.clone())
-            if (visitedPoints.length >= 2) {
-              trailGeo.setFromPoints(visitedPoints)
-            }
+            // Exhaust tail: offset backward from missile center
+            const tailPos = currentPos.clone().sub(travelDir.clone().multiplyScalar(spriteH * 0.45))
+            spawnExhaust(tailPos, travelDir)
 
-            // Spawn 3–5 exhaust particles at current position
-            const spawnCount = 3 + Math.floor(Math.random() * 3)
-            for (let p = 0; p < spawnCount; p++) {
-              const pMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 1 })
-              const pMesh = new THREE.Mesh(pGeo, pMat)
-              pMesh.position.set(
-                currentPos.x + (Math.random() - 0.5) * 0.015,
-                currentPos.y + (Math.random() - 0.5) * 0.015,
-                currentPos.z + (Math.random() - 0.5) * 0.015,
-              )
-              scene.add(pMesh)
-              particles.push({ mesh: pMesh, mat: pMat, age: 0 })
-            }
-
-            // Age particles — shrink and fade, remove at 20 frames
+            // Age all particles
             for (let p = particles.length - 1; p >= 0; p--) {
               const particle = particles[p]
               particle.age++
-              const life = particle.age / 20
-              particle.mat.opacity = 1 - life
-              particle.mesh.scale.setScalar(1 - life * 0.8)
-              if (particle.age >= 20) {
-                scene.remove(particle.mesh)
+              particle.sprite.position.add(particle.velocity)
+              const life = particle.age / particle.maxAge
+              if (particle.kind === 'fire') {
+                particle.mat.opacity = 1 - life
+                particle.mat.color.setRGB(1, Math.max(0, 0.4 - life * 0.4) * 0.5, 0)
+                const sz = particle.baseSize * (1 - life * 0.7)
+                particle.sprite.scale.set(sz, sz, 1)
+              } else {
+                particle.mat.opacity = 0.6 * (1 - life)
+                particle.mat.color.setHex(life > 0.5 ? 0x222222 : 0x444444)
+                const sz = particle.baseSize * (1 + life * 0.5)
+                particle.sprite.scale.set(sz, sz, 1)
+              }
+              if (particle.age >= particle.maxAge) {
+                scene.remove(particle.sprite)
                 particle.mat.dispose()
                 particles.splice(p, 1)
               }
@@ -307,30 +428,31 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
             if (t < 1) return true
 
-            // ── Clean up missile + trail ────────────────────────────────
-            scene.remove(missileMesh); missileGeo.dispose(); missileMat.dispose()
-            scene.remove(trail);       trailGeo.dispose();   trailMat.dispose()
-            // Drain remaining particles, then dispose shared geometry
-            particles.forEach(({ mesh, mat }) => { scene.remove(mesh); mat.dispose() })
-            particles.length = 0
-            pGeo.dispose()
+            // ── Cleanup ─────────────────────────────────────────────────
+            scene.remove(missileSprite)
+            spriteMat.dispose()
+            texRefCount--
+            if (texRefCount <= 0) missileTex.dispose()
 
-            // ── Notify impact ───────────────────────────────────────────
+            particles.forEach(({ sprite: ps, mat: pm }) => { scene.remove(ps); pm.dispose() })
+            particles.length = 0
+
+            // ── Notify impact ────────────────────────────────────────────
             onImpactRef.current?.()
 
-            // ── Flash ───────────────────────────────────────────────────
+            // ── Flash ────────────────────────────────────────────────────
             const flash = new THREE.PointLight(0xff2233, 3, 2)
-            flash.position.copy(to)
+            flash.position.copy(impactPoint)
             scene.add(flash)
             setTimeout(() => scene.remove(flash), 300)
 
-            // ── Impact ring (direct RAF) ────────────────────────────────
+            // ── Impact ring (direct RAF) ─────────────────────────────────
             const rGeo = new THREE.RingGeometry(0.015, 0.04, 32)
             const rMat = new THREE.MeshBasicMaterial({
               color: 0xff2233, transparent: true, opacity: 0.9, side: THREE.DoubleSide,
             })
             const ring = new THREE.Mesh(rGeo, rMat)
-            ring.position.copy(to)
+            ring.position.copy(impactPoint)
             ring.lookAt(new THREE.Vector3(0, 0, 0))
             scene.add(ring)
 
@@ -345,14 +467,14 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             animateRing()
 
             // ── Camera shake (direct RAF) ────────────────────────────────
-            const camera = cameraRef.current
-            if (camera) {
-              const originalPos = camera.position.clone()
+            const camForShake = cameraRef.current
+            if (camForShake) {
+              const originalPos = camForShake.position.clone()
               const shakeEnd = Date.now() + 300
               const shake = () => {
-                if (Date.now() > shakeEnd) { camera.position.copy(originalPos); return }
-                camera.position.x = originalPos.x + (Math.random() - 0.5) * 0.1
-                camera.position.y = originalPos.y + (Math.random() - 0.5) * 0.1
+                if (Date.now() > shakeEnd) { camForShake.position.copy(originalPos); return }
+                camForShake.position.x = originalPos.x + (Math.random() - 0.5) * 0.1
+                camForShake.position.y = originalPos.y + (Math.random() - 0.5) * 0.1
                 requestAnimationFrame(shake)
               }
               shake()

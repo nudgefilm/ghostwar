@@ -8,46 +8,61 @@ export const SoundEngine = {
   playLaunch() {
     const ctx = this.ctx
     if (!ctx) return
-    const osc = ctx.createOscillator()
+    const bufferSize = ctx.sampleRate * 0.8
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+    const data = buffer.getChannelData(0)
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.3
+    }
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'bandpass'
+    filter.frequency.setValueAtTime(200, ctx.currentTime)
+    filter.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.8)
+    filter.Q.value = 0.5
     const gain = ctx.createGain()
-    osc.connect(gain)
+    gain.gain.setValueAtTime(0.6, ctx.currentTime)
+    gain.gain.setValueAtTime(0.6, ctx.currentTime + 0.3)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8)
+    source.connect(filter)
+    filter.connect(gain)
     gain.connect(ctx.destination)
-    osc.type = 'sawtooth'
-    osc.frequency.setValueAtTime(80, ctx.currentTime)
-    osc.frequency.exponentialRampToValueAtTime(40, ctx.currentTime + 0.3)
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
-    osc.start()
-    osc.stop(ctx.currentTime + 0.3)
+    source.start()
   },
 
   playImpact() {
     const ctx = this.ctx
     if (!ctx) return
-    // Low-frequency thud
+    // Sub-bass thud: 60→15 Hz sine, 0.5s
     const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.connect(gain)
-    gain.connect(ctx.destination)
+    const oscGain = ctx.createGain()
     osc.type = 'sine'
-    osc.frequency.setValueAtTime(120, ctx.currentTime)
-    osc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + 0.4)
-    gain.gain.setValueAtTime(0.8, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-    osc.start()
-    osc.stop(ctx.currentTime + 0.4)
-    // High crack
-    const osc2 = ctx.createOscillator()
-    const gain2 = ctx.createGain()
-    osc2.connect(gain2)
-    gain2.connect(ctx.destination)
-    osc2.type = 'sawtooth'
-    osc2.frequency.setValueAtTime(300, ctx.currentTime)
-    osc2.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.2)
-    gain2.gain.setValueAtTime(0.4, ctx.currentTime)
-    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2)
-    osc2.start()
-    osc2.stop(ctx.currentTime + 0.2)
+    osc.frequency.setValueAtTime(60, ctx.currentTime)
+    osc.frequency.exponentialRampToValueAtTime(15, ctx.currentTime + 0.5)
+    oscGain.gain.setValueAtTime(1.0, ctx.currentTime)
+    oscGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5)
+    osc.connect(oscGain)
+    oscGain.connect(ctx.destination)
+    osc.start(); osc.stop(ctx.currentTime + 0.5)
+    // Mid crunch noise burst, decaying envelope
+    const bufSize = ctx.sampleRate * 0.3
+    const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate)
+    const d = buf.getChannelData(0)
+    for (let i = 0; i < bufSize; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 1.5)
+    }
+    const ns = ctx.createBufferSource()
+    ns.buffer = buf
+    const nf = ctx.createBiquadFilter()
+    nf.type = 'bandpass'
+    nf.frequency.value = 400
+    nf.Q.value = 0.8
+    const ng = ctx.createGain()
+    ng.gain.setValueAtTime(0.8, ctx.currentTime)
+    ng.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+    ns.connect(nf); nf.connect(ng); ng.connect(ctx.destination)
+    ns.start()
   },
 
   playAlert() {
