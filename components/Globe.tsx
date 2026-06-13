@@ -184,7 +184,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controls.dampingFactor = 0.05
     controls.minDistance = 1.5
     controls.maxDistance = 5
-    controls.target.set(0, 0.12, 0)
+    controls.target.set(0, 0.05, 0)
     controlsRef.current = controls
 
     // GeoJSON continent lines
