@@ -1,15 +1,56 @@
 export const SoundEngine = {
   ctx: null as AudioContext | null,
+  _buffers: {} as Record<string, AudioBuffer>,
 
   init() {
-    if (!this.ctx) this.ctx = new AudioContext()
+    if (!this.ctx) {
+      this.ctx = new AudioContext()
+      this._preload(['launch', 'impact'])
+    }
+  },
+
+  async _preload(names: string[]) {
+    for (const name of names) {
+      this._loadBuffer(name)
+    }
+  },
+
+  async _loadBuffer(name: string): Promise<AudioBuffer | null> {
+    if (this._buffers[name]) return this._buffers[name]
+    const ctx = this.ctx!
+    try {
+      const res = await fetch(`/sounds/${name}.wav`)
+      const ab = await res.arrayBuffer()
+      const buf = await ctx.decodeAudioData(ab)
+      this._buffers[name] = buf
+      return buf
+    } catch {
+      return null
+    }
+  },
+
+  _playBuffer(name: string, volume = 1.0, playbackRate = 1.0) {
+    const buf = this._buffers[name]
+    if (!buf || !this.ctx) return
+    const ctx = this.ctx
+    const src = ctx.createBufferSource()
+    src.buffer = buf
+    src.playbackRate.value = playbackRate
+    const gain = ctx.createGain()
+    gain.gain.value = volume
+    src.connect(gain)
+    gain.connect(ctx.destination)
+    src.start()
   },
 
   playLaunch() {
     const ctx = this.ctx!
+    if (this._buffers['launch']) {
+      this._playBuffer('launch', 1.0)
+      return
+    }
+    // Fallback: synthesized
     const t = ctx.currentTime
-
-    // Ignition crack: short broadband burst
     const crackSize = Math.floor(ctx.sampleRate * 0.08)
     const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate)
     const crackData = crackBuf.getChannelData(0)
@@ -23,8 +64,6 @@ export const SoundEngine = {
     crackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
     crackSrc.connect(crackGain); crackGain.connect(ctx.destination)
     crackSrc.start(t)
-
-    // Rising roar: noise through sweeping bandpass
     const roarSize = ctx.sampleRate * 2
     const roarBuf = ctx.createBuffer(1, roarSize, ctx.sampleRate)
     const roarData = roarBuf.getChannelData(0)
@@ -43,16 +82,12 @@ export const SoundEngine = {
     roarGain.gain.exponentialRampToValueAtTime(0.001, t + 2.0)
     roarSrc.connect(roarFilter); roarFilter.connect(roarGain); roarGain.connect(ctx.destination)
     roarSrc.start(t)
-
-    // Sub-bass rumble
     const rumble = ctx.createOscillator()
     const rumbleGain = ctx.createGain()
     rumble.type = 'sine'
     rumble.frequency.setValueAtTime(55, t)
     rumble.frequency.exponentialRampToValueAtTime(28, t + 2.0)
-    rumbleGain.gain.setValueAtTime(0, t)
-    rumbleGain.gain.linearRampToValueAtTime(0.55, t + 0.15)
-    rumbleGain.gain.setValueAtTime(0.55, t + 1.6)
+    rumbleGain.gain.setValueAtTime(0.55, t + 0.15)
     rumbleGain.gain.exponentialRampToValueAtTime(0.001, t + 2.0)
     rumble.connect(rumbleGain); rumbleGain.connect(ctx.destination)
     rumble.start(t); rumble.stop(t + 2.0)
@@ -63,8 +98,6 @@ export const SoundEngine = {
     if (!ctx) return
     const t = ctx.currentTime
     const dur = Math.max(1.5, flightMs / 1000)
-
-    // Looping rocket whoosh — 4s buffer looped for full flight duration
     const bufSize = ctx.sampleRate * 4
     const buffer = ctx.createBuffer(1, bufSize, ctx.sampleRate)
     const data = buffer.getChannelData(0)
@@ -72,18 +105,15 @@ export const SoundEngine = {
     const src = ctx.createBufferSource()
     src.buffer = buffer
     src.loop = true
-
     const filter = ctx.createBiquadFilter()
     filter.type = 'bandpass'
     filter.frequency.value = 620
     filter.Q.value = 1.8
-
     const gain = ctx.createGain()
     gain.gain.setValueAtTime(0, t)
     gain.gain.linearRampToValueAtTime(0.28, t + 0.5)
     gain.gain.setValueAtTime(0.28, t + dur - 0.8)
     gain.gain.exponentialRampToValueAtTime(0.001, t + dur)
-
     src.connect(filter); filter.connect(gain); gain.connect(ctx.destination)
     src.start(t)
     src.stop(t + dur)
@@ -92,9 +122,12 @@ export const SoundEngine = {
   playImpact() {
     const ctx = this.ctx
     if (!ctx) return
+    if (this._buffers['impact']) {
+      this._playBuffer('impact', 1.0)
+      return
+    }
+    // Fallback: synthesized
     const t = ctx.currentTime
-
-    // Initial crack: ultra-short broadband burst
     const crackSize = Math.floor(ctx.sampleRate * 0.05)
     const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate)
     const crackData = crackBuf.getChannelData(0)
@@ -107,8 +140,6 @@ export const SoundEngine = {
     crackGain.gain.setValueAtTime(2.2, t)
     crackSrc.connect(crackGain); crackGain.connect(ctx.destination)
     crackSrc.start(t)
-
-    // Deep boom: sub-bass sine sweep
     const boom = ctx.createOscillator()
     const boomGain = ctx.createGain()
     boom.type = 'sine'
@@ -118,8 +149,6 @@ export const SoundEngine = {
     boomGain.gain.exponentialRampToValueAtTime(0.001, t + 2.5)
     boom.connect(boomGain); boomGain.connect(ctx.destination)
     boom.start(t); boom.stop(t + 2.5)
-
-    // Long rumble tail: lowpass noise
     const rumbleSize = ctx.sampleRate * 3
     const rumbleBuf = ctx.createBuffer(1, rumbleSize, ctx.sampleRate)
     const rumbleData = rumbleBuf.getChannelData(0)
@@ -134,25 +163,6 @@ export const SoundEngine = {
     rumbleGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0)
     rumbleSrc.connect(rumbleFilter); rumbleFilter.connect(rumbleGain); rumbleGain.connect(ctx.destination)
     rumbleSrc.start(t)
-
-    // Mid-range debris crackle
-    const midSize = Math.floor(ctx.sampleRate * 0.35)
-    const midBuf = ctx.createBuffer(1, midSize, ctx.sampleRate)
-    const midData = midBuf.getChannelData(0)
-    for (let i = 0; i < midSize; i++) {
-      midData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / midSize, 1.2)
-    }
-    const midSrc = ctx.createBufferSource()
-    midSrc.buffer = midBuf
-    const midFilter = ctx.createBiquadFilter()
-    midFilter.type = 'bandpass'
-    midFilter.frequency.value = 850
-    midFilter.Q.value = 0.7
-    const midGain = ctx.createGain()
-    midGain.gain.setValueAtTime(1.1, t)
-    midGain.gain.exponentialRampToValueAtTime(0.001, t + 0.35)
-    midSrc.connect(midFilter); midFilter.connect(midGain); midGain.connect(ctx.destination)
-    midSrc.start(t)
   },
 
   playAlert() {
@@ -177,9 +187,13 @@ export const SoundEngine = {
   playNukeLaunch() {
     const ctx = this.ctx
     if (!ctx) return
+    if (this._buffers['launch']) {
+      // Nuke: same file, slightly slower pitch for heavier feel
+      this._playBuffer('launch', 1.2, 0.85)
+      return
+    }
+    // Fallback: synthesized
     const t = ctx.currentTime
-
-    // Heavy ignition: longer, louder crack
     const crackSize = Math.floor(ctx.sampleRate * 0.15)
     const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate)
     const crackData = crackBuf.getChannelData(0)
@@ -193,8 +207,6 @@ export const SoundEngine = {
     crackGain.gain.exponentialRampToValueAtTime(0.001, t + 0.15)
     crackSrc.connect(crackGain); crackGain.connect(ctx.destination)
     crackSrc.start(t)
-
-    // Massive rising roar
     const roarSize = ctx.sampleRate * 3
     const roarBuf = ctx.createBuffer(1, roarSize, ctx.sampleRate)
     const roarData = roarBuf.getChannelData(0)
@@ -213,16 +225,12 @@ export const SoundEngine = {
     roarGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0)
     roarSrc.connect(roarFilter); roarFilter.connect(roarGain); roarGain.connect(ctx.destination)
     roarSrc.start(t)
-
-    // Deep sub-bass
     const osc = ctx.createOscillator()
     const oscGain = ctx.createGain()
     osc.type = 'sine'
     osc.frequency.setValueAtTime(45, t)
     osc.frequency.exponentialRampToValueAtTime(20, t + 3.0)
-    oscGain.gain.setValueAtTime(0, t)
-    oscGain.gain.linearRampToValueAtTime(0.8, t + 0.2)
-    oscGain.gain.setValueAtTime(0.8, t + 2.2)
+    oscGain.gain.setValueAtTime(0.8, t + 0.2)
     oscGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0)
     osc.connect(oscGain); oscGain.connect(ctx.destination)
     osc.start(t); osc.stop(t + 3.0)
