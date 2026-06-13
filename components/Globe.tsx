@@ -157,12 +157,12 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     scene.add(
       new THREE.LineSegments(
         new THREE.WireframeGeometry(new THREE.SphereGeometry(RADIUS, 32, 32)),
-        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.4, transparent: true }),
+        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.44, transparent: true }),
       ),
     )
 
     // Graticule — lat/lon grid every 30°
-    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.15, transparent: true })
+    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0, transparent: true })
     ;[-60, -30, 0, 30, 60].forEach(lat => {
       const pts = Array.from({ length: 65 }, (_, i) =>
         latLngToVec3(lat, (i / 64) * 360 - 180, RADIUS + 0.002),
@@ -188,7 +188,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controlsRef.current = controls
 
     // GeoJSON continent lines
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.66, transparent: true })
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.73, transparent: true })
     fetch('/ne_110m_land.json')
       .then(r => r.json())
       .then((data: { features: GeoFeature[] }) => {
