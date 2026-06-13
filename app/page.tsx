@@ -50,7 +50,7 @@ function DamageBar({ pct }: { pct: number }) {
         ? 'bg-yellow-400'
         : 'bg-[#FF2233]'
   return (
-    <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden mx-2">
+    <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden mx-2">
       <div className={`h-full ${color} transition-all duration-700`} style={{ width: `${Math.min(pct, 100)}%` }} />
     </div>
   )
@@ -224,8 +224,13 @@ export default function Home() {
     (weaponType === 'missile' ? missiles : nukes) < quantity
 
   // ─────────────────────────────────────────────────────────────────────────
+  const panelStyle: React.CSSProperties = {
+    background: 'rgba(11,11,12,0.75)',
+    backdropFilter: 'blur(8px)',
+  }
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0B0B0C] font-mono">
+    <div className="relative h-screen overflow-hidden font-mono">
 
       {/* ── Entry Modal ── */}
       {!player && <EntryModal onEnter={handleEnter} />}
@@ -237,273 +242,269 @@ export default function Home() {
         </div>
       )}
 
-      {/* ══════════ Top bar ══════════ */}
-      <header className="h-10 bg-zinc-950 border-b border-zinc-800 flex items-center px-3 shrink-0 gap-4 z-10">
+      {/* ══════════ Globe — full screen background ══════════ */}
+      <div className="fixed inset-0 z-0">
+        <Globe ref={globeRef} />
+      </div>
+
+      {/* ══════════ Top bar (floating) ══════════ */}
+      <header
+        className="fixed top-0 left-0 right-0 z-20 h-10 flex items-center px-3 gap-4"
+        style={{ ...panelStyle, borderBottom: '1px solid rgba(255,34,51,0.15)' }}
+      >
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
-          <span className="text-zinc-700 text-[10px]">// GLOBAL WARFARE SIM</span>
+          <span className="text-zinc-500 text-[10px]">// GLOBAL WARFARE SIM</span>
         </div>
         <div className="flex-1 flex items-center justify-center overflow-hidden">
           {news[0] ? (
-            <span className="text-zinc-600 text-[10px] tracking-wider truncate">
+            <span className="text-zinc-400 text-[10px] tracking-wider truncate">
               ─ {news[0].content} ─
             </span>
           ) : (
-            <span className="text-zinc-800 text-[10px] tracking-wider">
+            <span className="text-zinc-600 text-[10px] tracking-wider">
               ─── AWAITING FIRST STRIKE ───
             </span>
           )}
         </div>
-        <div className="shrink-0 text-zinc-700 text-[10px] tracking-wider">
+        <div className="shrink-0 text-zinc-400 text-[10px] tracking-wider">
           {player ? (
-            <span>
-              {COUNTRY_FLAGS[player.country_code]} {player.nickname}
-            </span>
+            <span>{COUNTRY_FLAGS[player.country_code]} {player.nickname}</span>
           ) : (
             'UNIDENTIFIED'
           )}
         </div>
       </header>
 
-      {/* ══════════ 3-col layout ══════════ */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* ══════════ LEFT PANEL (floating) ══════════ */}
+      <aside
+        className="fixed left-0 top-0 h-screen z-10 w-[280px] flex flex-col overflow-y-auto pt-10"
+        style={{ ...panelStyle, borderRight: '1px solid rgba(255,34,51,0.15)' }}
+      >
 
-        {/* ════ LEFT PANEL ════ */}
-        <aside className="w-72 bg-zinc-900 border-r border-zinc-800 flex flex-col overflow-y-auto shrink-0">
+        {/* § 1 — OPERATOR */}
+        <div className="p-3 border-b border-zinc-800/60">
+          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">OPERATOR</div>
+          {player ? (
+            <>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl leading-none">{COUNTRY_FLAGS[player.country_code]}</span>
+                <div>
+                  <div className="text-zinc-200 text-sm font-bold tracking-wide">{player.nickname}</div>
+                  <div className="text-zinc-200 text-sm">{COUNTRY_NAMES[player.country_code]}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 text-[10px]">
+                <span className="text-zinc-500">
+                  🚀 <span className="text-green-400 font-bold">{missiles}</span>
+                </span>
+                <span className="text-zinc-500">
+                  ☢️ <span className="text-orange-400 font-bold">{nukes}</span>
+                </span>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('ghostwar_player')
+                    setPlayer(null)
+                  }}
+                  className="ml-auto text-zinc-700 text-[10px] hover:text-zinc-500 transition-colors cursor-pointer"
+                >
+                  [EXIT]
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="text-zinc-700 text-[10px]">NOT AUTHENTICATED</div>
+          )}
+        </div>
 
-          {/* § 1 — OPERATOR */}
-          <div className="p-3 border-b border-zinc-800">
-            <div className="text-zinc-600 text-[10px] tracking-widest mb-2">OPERATOR</div>
-            {player ? (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl leading-none">{COUNTRY_FLAGS[player.country_code]}</span>
-                  <div>
-                    <div className="text-zinc-200 text-xs font-bold tracking-wide">{player.nickname}</div>
-                    <div className="text-zinc-600 text-[10px]">{COUNTRY_NAMES[player.country_code]}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 text-[10px]">
-                  <span className="text-zinc-500">
-                    🚀 <span className="text-green-400 font-bold">{missiles}</span>
-                  </span>
-                  <span className="text-zinc-500">
-                    ☢️ <span className="text-orange-400 font-bold">{nukes}</span>
-                  </span>
-                  <button
-                    onClick={() => {
-                      localStorage.removeItem('ghostwar_player')
-                      setPlayer(null)
-                    }}
-                    className="ml-auto text-zinc-700 text-[10px] hover:text-zinc-500 transition-colors cursor-pointer"
-                  >
-                    [EXIT]
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="text-zinc-700 text-[10px]">NOT AUTHENTICATED</div>
-            )}
+        {/* § 2 — WEAPONS */}
+        <div className="p-3 border-b border-zinc-800/60">
+          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">WEAPONS</div>
+          <div className="flex gap-2 mb-3">
+            <button
+              onClick={() => setWeaponType('missile')}
+              className={`flex-1 py-1.5 text-[10px] tracking-widest border transition-colors cursor-pointer ${
+                weaponType === 'missile'
+                  ? 'bg-red-950 border-red-800 text-red-300'
+                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-500 hover:border-zinc-600'
+              }`}
+            >
+              🚀 MISSILE
+            </button>
+            <button
+              onClick={() => setWeaponType('nuke')}
+              disabled={nukes === 0}
+              className={`flex-1 py-1.5 text-[10px] tracking-widest border transition-colors ${
+                weaponType === 'nuke'
+                  ? 'bg-orange-950 border-orange-700 text-orange-300'
+                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-600 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+              }`}
+            >
+              ☢️ NUKE
+            </button>
           </div>
+          <input
+            type="range"
+            min={1}
+            max={Math.min(10, weaponType === 'nuke' ? nukes : missiles)}
+            value={quantity}
+            onChange={e => setQuantity(Number(e.target.value))}
+            className="w-full mb-2 accent-red-600"
+          />
+          <div className="text-zinc-500 text-[10px] text-center tracking-widest">
+            <span className="text-white font-bold">{quantity}</span>
+            {' × '}
+            <span className={weaponType === 'nuke' ? 'text-orange-400' : 'text-red-400'}>
+              {weaponType.toUpperCase()}
+            </span>
+          </div>
+        </div>
 
-          {/* § 2 — WEAPONS */}
-          <div className="p-3 border-b border-zinc-800">
-            <div className="text-zinc-600 text-[10px] tracking-widest mb-2">WEAPONS</div>
-            <div className="flex gap-2 mb-3">
-              <button
-                onClick={() => setWeaponType('missile')}
-                className={`flex-1 py-1.5 text-[10px] tracking-widest border transition-colors cursor-pointer ${
-                  weaponType === 'missile'
-                    ? 'bg-red-950 border-red-800 text-red-300'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-500 hover:border-zinc-600'
-                }`}
-              >
-                🚀 MISSILE
-              </button>
-              <button
-                onClick={() => setWeaponType('nuke')}
-                disabled={nukes === 0}
-                className={`flex-1 py-1.5 text-[10px] tracking-widest border transition-colors ${
-                  weaponType === 'nuke'
-                    ? 'bg-orange-950 border-orange-700 text-orange-300'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-600 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
-                }`}
-              >
-                ☢️ NUKE
-              </button>
+        {/* § 3 — TARGET */}
+        <div className="p-3 border-b border-zinc-800/60">
+          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">TARGET</div>
+          <select
+            value={targetCountry ?? ''}
+            onChange={e => setTargetCountry(e.target.value || null)}
+            className="w-full bg-zinc-800/60 border border-zinc-700 text-zinc-300 text-[10px] px-2 py-1.5 mb-2 focus:outline-none focus:border-zinc-500 cursor-pointer"
+          >
+            <option value="">── SELECT TARGET ──</option>
+            {COUNTRIES.filter(c => c.code !== player?.country_code).map(c => (
+              <option key={c.code} value={c.code}>
+                {c.flag} {c.name}
+              </option>
+            ))}
+          </select>
+          {targetCountry && (
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-base leading-none">{COUNTRY_FLAGS[targetCountry]}</span>
+              <span className="text-zinc-200 text-sm">{COUNTRY_NAMES[targetCountry]}</span>
             </div>
-            <input
-              type="range"
-              min={1}
-              max={Math.min(10, weaponType === 'nuke' ? nukes : missiles)}
-              value={quantity}
-              onChange={e => setQuantity(Number(e.target.value))}
-              className="w-full mb-2 accent-red-600"
-            />
-            <div className="text-zinc-500 text-[10px] text-center tracking-widest">
-              <span className="text-white font-bold">{quantity}</span>
-              {' × '}
-              <span className={weaponType === 'nuke' ? 'text-orange-400' : 'text-red-400'}>
-                {weaponType.toUpperCase()}
+          )}
+          {targetCountry && player && (
+            <div className="text-zinc-500 text-xs">
+              ETA{' '}
+              <span className="text-zinc-200 text-sm">
+                {Math.round(
+                  (() => {
+                    const f = COUNTRY_COORDS[player.country_code]
+                    const t = COUNTRY_COORDS[targetCountry]
+                    if (!f || !t) return 0
+                    const R = 6371
+                    const lat1 = f[0] * (Math.PI / 180)
+                    const lon1 = f[1] * (Math.PI / 180)
+                    const lat2 = t[0] * (Math.PI / 180)
+                    const lon2 = t[1] * (Math.PI / 180)
+                    const a =
+                      Math.sin((lat2 - lat1) / 2) ** 2 +
+                      Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2
+                    const dist = R * 2 * Math.asin(Math.sqrt(a))
+                    return Math.max(10, Math.min(30, (dist / 20000) * 30))
+                  })(),
+                )}{' '}
+                sec
               </span>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* § 3 — TARGET */}
-          <div className="p-3 border-b border-zinc-800">
-            <div className="text-zinc-600 text-[10px] tracking-widest mb-2">TARGET</div>
-            <select
-              value={targetCountry ?? ''}
-              onChange={e => setTargetCountry(e.target.value || null)}
-              className="w-full bg-zinc-800 border border-zinc-700 text-zinc-300 text-[10px] px-2 py-1.5 mb-2 focus:outline-none focus:border-zinc-500 cursor-pointer"
-            >
-              <option value="">── SELECT TARGET ──</option>
-              {COUNTRIES.filter(c => c.code !== player?.country_code).map(c => (
-                <option key={c.code} value={c.code}>
-                  {c.flag} {c.name}
-                </option>
-              ))}
-            </select>
-            {targetCountry && (
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-base leading-none">{COUNTRY_FLAGS[targetCountry]}</span>
-                <span className="text-zinc-300 text-[10px]">{COUNTRY_NAMES[targetCountry]}</span>
-              </div>
-            )}
-            {targetCountry && player && (
-              <div className="text-zinc-700 text-[10px]">
-                ETA{' '}
-                <span className="text-zinc-400">
-                  {Math.round(
-                    (() => {
-                      const f = COUNTRY_COORDS[player.country_code]
-                      const t = COUNTRY_COORDS[targetCountry]
-                      if (!f || !t) return 0
-                      const R = 6371
-                      const lat1 = f[0] * (Math.PI / 180)
-                      const lon1 = f[1] * (Math.PI / 180)
-                      const lat2 = t[0] * (Math.PI / 180)
-                      const lon2 = t[1] * (Math.PI / 180)
-                      const a =
-                        Math.sin((lat2 - lat1) / 2) ** 2 +
-                        Math.cos(lat1) * Math.cos(lat2) * Math.sin((lon2 - lon1) / 2) ** 2
-                      const dist = R * 2 * Math.asin(Math.sqrt(a))
-                      return Math.max(10, Math.min(30, (dist / 20000) * 30))
-                    })(),
-                  )}{' '}
-                  sec
-                </span>
-              </div>
-            )}
-          </div>
+        {/* § 4 — LAUNCH */}
+        <div className="p-3 border-b border-zinc-800/60">
+          <button
+            onClick={handleLaunch}
+            disabled={launchDisabled}
+            className="w-full py-3 bg-red-900 hover:bg-red-700 active:bg-red-600 disabled:opacity-25 disabled:cursor-not-allowed text-red-100 text-xs tracking-[0.3em] border border-red-800 hover:border-red-600 transition-all cursor-pointer"
+          >
+            {isLaunching ? '[ LAUNCHING... ]' : '🔴 LAUNCH'}
+          </button>
+        </div>
 
-          {/* § 4 — LAUNCH */}
-          <div className="p-3 border-b border-zinc-800">
-            <button
-              onClick={handleLaunch}
-              disabled={launchDisabled}
-              className="w-full py-3 bg-red-900 hover:bg-red-700 active:bg-red-600 disabled:opacity-25 disabled:cursor-not-allowed text-red-100 text-xs tracking-[0.3em] border border-red-800 hover:border-red-600 transition-all cursor-pointer"
-            >
-              {isLaunching ? '[ LAUNCHING... ]' : '🔴 LAUNCH'}
-            </button>
-          </div>
-
-          {/* § 5 — DEFENSE */}
-          <div className="p-3 border-b border-zinc-800">
-            <div className="text-zinc-600 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
-            <button
-              disabled
-              className="w-full py-1.5 mb-2 bg-zinc-800 border border-zinc-700 text-zinc-600 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
-            >
-              🛡️ INTERCEPT
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-zinc-600" style={{ width: '0%' }} />
-              </div>
-              <span className="text-zinc-700 text-[10px]">0%</span>
+        {/* § 5 — DEFENSE */}
+        <div className="p-3 border-b border-zinc-800/60">
+          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
+          <button
+            disabled
+            className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-600 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
+          >
+            🛡️ INTERCEPT
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="h-full bg-zinc-600" style={{ width: '0%' }} />
             </div>
+            <span className="text-zinc-700 text-[10px]">0%</span>
           </div>
+        </div>
 
-          {/* § 6 — ALLIANCES */}
-          <div className="p-3">
-            <div className="text-zinc-600 text-[10px] tracking-widest mb-2">ALLIANCES</div>
-            <div className="text-zinc-700 text-[10px]">No active alliances</div>
-          </div>
-        </aside>
+        {/* § 6 — ALLIANCES */}
+        <div className="p-3">
+          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">ALLIANCES</div>
+          <div className="text-zinc-700 text-[10px]">No active alliances</div>
+        </div>
+      </aside>
 
-        {/* ════ CENTER: Globe ════ */}
-        <main className="flex-1 relative">
-          <Globe ref={globeRef} />
-        </main>
+      {/* ══════════ RIGHT PANEL (floating) ══════════ */}
+      <aside
+        className="fixed right-0 top-0 h-screen z-10 w-[300px] flex flex-col overflow-y-auto pt-10"
+        style={{ ...panelStyle, borderLeft: '1px solid rgba(255,34,51,0.15)' }}
+      >
 
-        {/* ════ RIGHT PANEL ════ */}
-        <aside className="w-72 bg-zinc-900 border-l border-zinc-800 flex flex-col overflow-y-auto shrink-0">
+        {/* Breaking news */}
+        <div className="p-3 border-b border-zinc-800/60 flex-1 min-h-0">
+          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">BREAKING NEWS</div>
+          {news.length === 0 ? (
+            <div className="text-zinc-600 text-[10px]">Awaiting first strike...</div>
+          ) : (
+            <div className="space-y-1.5 overflow-y-auto">
+              {news.map((item, i) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    const code = item.target_country
+                    if (!code) return
+                    const coords = COUNTRY_COORDS[code]
+                    if (coords) globeRef.current?.flyTo(coords[0], coords[1])
+                  }}
+                  className={`w-full text-left text-sm leading-relaxed block cursor-pointer hover:opacity-80 transition-opacity p-2 border-l-2 border-[#FF2233] ${
+                    i === 0 ? 'bg-zinc-800/80 text-white' : 'bg-zinc-900/60 text-zinc-200'
+                  }`}
+                >
+                  <TypewriterText text={item.content} instant={i !== 0} speed={18} />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-          {/* Breaking news */}
-          <div className="p-3 border-b border-zinc-800 flex-1 min-h-0">
-            <div className="text-zinc-600 text-[10px] tracking-widest mb-2">BREAKING NEWS</div>
-            {news.length === 0 ? (
-              <div className="text-zinc-800 text-[10px]">Awaiting first strike...</div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {news.map((item, i) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      const code = item.target_country
-                      if (!code) return
-                      const coords = COUNTRY_COORDS[code]
-                      if (coords) globeRef.current?.flyTo(coords[0], coords[1])
-                    }}
-                    className={`w-full text-left text-[10px] leading-relaxed block cursor-pointer hover:opacity-80 transition-opacity ${
-                      i === 0 ? 'neon-glow' : 'text-zinc-600'
-                    }`}
-                  >
-                    <TypewriterText text={item.content} instant={i !== 0} speed={18} />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Damage rankings */}
-          <div className="p-3">
-            <div className="text-zinc-600 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
-            {sortedCountries.length === 0 ? (
-              <div className="text-zinc-800 text-[10px]">No damage recorded</div>
-            ) : (
-              <div className="space-y-2">
-                {sortedCountries.map((c, i) => (
-                  <button
-                    key={c.code}
-                    onClick={() => {
-                      const coords = COUNTRY_COORDS[c.code]
-                      if (coords) globeRef.current?.flyTo(coords[0], coords[1])
-                    }}
-                    className="w-full flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
-                  >
-                    <span className="text-zinc-600 text-[10px] w-4 shrink-0">#{i + 1}</span>
-                    <span className="text-[12px] shrink-0">{c.flag}</span>
-                    <DamageBar pct={c.damage_percent} />
-                    <span
-                      className={`text-[10px] w-8 text-right shrink-0 ${
-                        c.damage_percent >= 70
-                          ? 'text-[#FF2233]'
-                          : c.damage_percent >= 30
-                            ? 'text-yellow-400'
-                            : 'text-[#00FFAA]'
-                      }`}
-                    >
-                      {Math.round(c.damage_percent)}%
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </aside>
-      </div>
+        {/* Damage rankings */}
+        <div className="p-3">
+          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
+          {sortedCountries.length === 0 ? (
+            <div className="text-zinc-600 text-[10px]">No damage recorded</div>
+          ) : (
+            <div className="space-y-2">
+              {sortedCountries.map((c, i) => (
+                <button
+                  key={c.code}
+                  onClick={() => {
+                    const coords = COUNTRY_COORDS[c.code]
+                    if (coords) globeRef.current?.flyTo(coords[0], coords[1])
+                  }}
+                  className="w-full flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  <span className="text-zinc-600 text-xs w-4 shrink-0">#{i + 1}</span>
+                  <span className="text-sm shrink-0">{c.flag}</span>
+                  <span className="text-zinc-200 text-xs w-16 truncate shrink-0">{c.name}</span>
+                  <DamageBar pct={c.damage_percent} />
+                  <span className="text-zinc-400 text-[10px] w-9 text-right shrink-0">
+                    {Math.round(c.damage_percent)}%
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   )
 }

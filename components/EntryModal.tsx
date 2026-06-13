@@ -103,7 +103,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Callsign input */}
             <div>
-              <label className="text-zinc-500 text-[10px] tracking-[0.3em] block mb-1.5">
+              <label className="text-zinc-500 text-xs tracking-[0.3em] block mb-1.5">
                 OPERATOR CALLSIGN
               </label>
               <input
@@ -114,22 +114,22 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
                 maxLength={16}
                 placeholder="ENTER CALLSIGN..."
                 autoFocus
-                className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-xs px-3 py-2.5 outline-none transition-colors placeholder:text-zinc-700 tracking-widest"
+                className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-sm px-3 py-2.5 outline-none transition-colors placeholder:text-zinc-700 tracking-widest"
               />
-              <div className="text-zinc-700 text-[10px] mt-1">
+              <div className="text-zinc-700 text-xs mt-1">
                 {nickname.length}/16 — A-Z, 0-9, _ only
               </div>
             </div>
 
             {/* Nation selector */}
             <div>
-              <label className="text-zinc-500 text-[10px] tracking-[0.3em] block mb-1.5">
+              <label className="text-zinc-500 text-xs tracking-[0.3em] block mb-1.5">
                 NATION
               </label>
               <select
                 value={countryCode}
                 onChange={e => setCountryCode(e.target.value)}
-                className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-xs px-3 py-2.5 outline-none transition-colors cursor-pointer appearance-none"
+                className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-sm px-3 py-2.5 outline-none transition-colors cursor-pointer appearance-none"
               >
                 <option value="">─── SELECT NATION ───</option>
                 {COUNTRIES.map(c => (
@@ -142,7 +142,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
 
             {/* Error */}
             {error && (
-              <div className={`text-[10px] tracking-widest text-center py-1.5 border bg-[#FF2233]/5 ${
+              <div className={`text-xs tracking-widest text-center py-1.5 border bg-[#FF2233]/5 ${
                 error === 'CALLSIGN TAKEN'
                   ? 'neon-glow border-[#FF2233] font-bold'
                   : 'text-[#FF2233] border-[#FF2233]/30'
@@ -155,7 +155,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-[#FF2233]/10 border border-[#FF2233] text-[#FF2233] text-xs tracking-[0.3em] hover:bg-[#FF2233]/20 active:bg-[#FF2233]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed neon-border-pulse"
+              className="w-full py-3 bg-[#FF2233]/10 border border-[#FF2233] text-[#FF2233] text-sm tracking-[0.3em] hover:bg-[#FF2233]/20 active:bg-[#FF2233]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed neon-border-pulse"
             >
               {loading ? '[ CONNECTING... ]' : '[ ENTER WAR ROOM ]'}
             </button>
