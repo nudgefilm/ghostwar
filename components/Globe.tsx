@@ -40,70 +40,16 @@ function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
-interface MissileParticle {
-  sprite: THREE.Sprite
-  mat: THREE.SpriteMaterial
-  age: number
-  maxAge: number
-  kind: 'fire' | 'smoke'
+interface GlobeParticle {
+  mesh: THREE.Mesh
+  mat: THREE.MeshBasicMaterial
+  life: number
+  maxLife: number
   velocity: THREE.Vector3
-  baseSize: number
-}
-
-function createMissileTexture(isNuke = false): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas')
-  canvas.width = 32
-  canvas.height = 80
-  const ctx = canvas.getContext('2d')!
-
-  // Body — narrow light-gray cylinder with subtle metallic sheen
-  const bodyGrad = ctx.createLinearGradient(0, 0, 32, 0)
-  bodyGrad.addColorStop(0, '#888888')
-  bodyGrad.addColorStop(0.3, '#EEEEEE')
-  bodyGrad.addColorStop(0.7, '#CCCCCC')
-  bodyGrad.addColorStop(1, '#666666')
-  ctx.fillStyle = bodyGrad
-  ctx.fillRect(10, 10, 12, 52)
-
-  // Dark pointed nose cone
-  ctx.fillStyle = '#444444'
-  ctx.beginPath()
-  ctx.moveTo(16, 0)
-  ctx.lineTo(22, 10)
-  ctx.lineTo(10, 10)
-  ctx.closePath()
-  ctx.fill()
-
-  // Two thin red stripes
-  ctx.fillStyle = '#FF2233'
-  ctx.fillRect(10, 28, 12, 2)
-  ctx.fillRect(10, 34, 12, 2)
-
-  // Small fins at base
-  ctx.fillStyle = '#999999'
-  ctx.beginPath()
-  ctx.moveTo(10, 52); ctx.lineTo(5, 65); ctx.lineTo(10, 63)
-  ctx.closePath()
-  ctx.fill()
-  ctx.beginPath()
-  ctx.moveTo(22, 52); ctx.lineTo(27, 65); ctx.lineTo(22, 63)
-  ctx.closePath()
-  ctx.fill()
-
-  // Exhaust nozzle
-  ctx.fillStyle = '#333333'
-  ctx.fillRect(12, 62, 8, 4)
-
-  // Nuke variant: darken body, orange stripes
-  if (isNuke) {
-    ctx.fillStyle = 'rgba(0,0,0,0.4)'
-    ctx.fillRect(10, 10, 12, 52)
-    ctx.fillStyle = '#FF8800'
-    ctx.fillRect(10, 28, 12, 2)
-    ctx.fillRect(10, 34, 12, 2)
-  }
-
-  return new THREE.CanvasTexture(canvas)
+  startSize: number
+  endSize: number
+  startOpacity: number
+  endOpacity: number
 }
 
 export interface GlobeHandle {
@@ -311,177 +257,208 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       if (!scene) return
 
       const isNuke = type === 'nuke'
-      const spriteW = isNuke ? 0.035 : 0.025
-      const spriteH = isNuke ? 0.08 : 0.06
+      const arcH = isNuke ? 0.6 : 0.35
+      const headColor = isNuke ? 0xFF6600 : 0xFF2233
+      const fireColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFAA00]
+      const debrisColors = [0xFF4400, 0xFF6600, 0xFFAA00, 0xFF2233]
 
       // Pre-compute 101 SLERP path points (shared across all staggered missiles)
       const PATH_COUNT = 100
       const pathPoints: THREE.Vector3[] = []
       for (let pi = 0; pi <= PATH_COUNT; pi++) {
-        pathPoints.push(getMissilePoint(fromLat, fromLng, toLat, toLng, pi / PATH_COUNT))
+        pathPoints.push(getMissilePoint(fromLat, fromLng, toLat, toLng, pi / PATH_COUNT, arcH))
       }
       const impactPoint = pathPoints[PATH_COUNT]
 
-      // Canvas texture shared across quantity, ref-counted for disposal
-      const missileTex = createMissileTexture(isNuke)
-      let texRefCount = quantity
-
       for (let i = 0; i < quantity; i++) {
         setTimeout(() => {
-          // ── Sprite missile ────────────────────────────────────────────
-          const spriteMat = new THREE.SpriteMaterial({ map: missileTex, transparent: true })
-          const missileSprite = new THREE.Sprite(spriteMat)
-          missileSprite.scale.set(spriteW, spriteH, 1)
-          scene.add(missileSprite)
+          // ── Glowing head: small sphere + point light ───────────────────
+          const headGeo = new THREE.SphereGeometry(0.012, 8, 8)
+          const headMat = new THREE.MeshBasicMaterial({ color: headColor })
+          const head = new THREE.Mesh(headGeo, headMat)
+          const headLight = new THREE.PointLight(headColor, 2, 0.4)
+          scene.add(head)
+          scene.add(headLight)
 
-          const particles: MissileParticle[] = []
+          // ── Persistent trail line ──────────────────────────────────────
+          const trailGeo = new THREE.BufferGeometry()
+          const trailMat = new THREE.LineBasicMaterial({ color: 0xFF2233, transparent: true, opacity: 0.4 })
+          const trailLine = new THREE.Line(trailGeo, trailMat)
+          scene.add(trailLine)
+          const visitedPts: THREE.Vector3[] = []
 
-          const spawnExhaust = (tailPos: THREE.Vector3, travelDir: THREE.Vector3) => {
-            // Fire: 2 per frame — orange→red, 12-frame life, tight spread
-            for (let p = 0; p < 2; p++) {
-              const sz = 0.004 + Math.random() * 0.004
-              const pMat = new THREE.SpriteMaterial({ color: 0xff6600, transparent: true, opacity: 1 })
-              const pSprite = new THREE.Sprite(pMat)
-              pSprite.scale.set(sz, sz, 1)
-              pSprite.position.set(
-                tailPos.x + (Math.random() - 0.5) * 0.003,
-                tailPos.y + (Math.random() - 0.5) * 0.003,
-                tailPos.z + (Math.random() - 0.5) * 0.003,
-              )
-              const vel = travelDir.clone().negate().multiplyScalar(0.002).add(
-                new THREE.Vector3((Math.random()-0.5)*0.001, (Math.random()-0.5)*0.001, (Math.random()-0.5)*0.001),
-              )
-              scene.add(pSprite)
-              particles.push({ sprite: pSprite, mat: pMat, age: 0, maxAge: 12, kind: 'fire', velocity: vel, baseSize: sz })
+          // ── Particle pool — shared base geometry ───────────────────────
+          const pBaseGeo = new THREE.SphereGeometry(0.01, 4, 4)
+          const particles: GlobeParticle[] = []
+
+          const addParticle = (
+            pos: THREE.Vector3,
+            vel: THREE.Vector3,
+            color: number,
+            maxLife: number,
+            startSize: number,
+            endSize: number,
+            startOpacity: number,
+          ) => {
+            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: startOpacity })
+            const mesh = new THREE.Mesh(pBaseGeo, mat)
+            mesh.position.copy(pos)
+            mesh.scale.setScalar(startSize / 0.01)
+            scene.add(mesh)
+            particles.push({ mesh, mat, life: 0, maxLife, velocity: vel, startSize, endSize, startOpacity, endOpacity: 0 })
+          }
+
+          const spawnFlight = (pos: THREE.Vector3, travelDir: THREE.Vector3) => {
+            // 5 fire particles at head
+            for (let p = 0; p < 5; p++) {
+              const sz = 0.008 + Math.random() * 0.007
+              const vel = travelDir.clone().negate().multiplyScalar(0.002 + Math.random() * 0.002)
+              addParticle(pos, vel, fireColors[Math.floor(Math.random() * 4)], 15, sz, 0, 1)
             }
-            // Smoke: 1 per frame — gray, grows, 15-frame life
-            {
-              const sz = 0.006 + Math.random() * 0.006
-              const pMat = new THREE.SpriteMaterial({ color: 0x444444, transparent: true, opacity: 0.6 })
-              const pSprite = new THREE.Sprite(pMat)
-              pSprite.scale.set(sz, sz, 1)
-              const smokePos = tailPos.clone().sub(travelDir.clone().multiplyScalar(spriteH * 0.15))
-              pSprite.position.set(
-                smokePos.x + (Math.random() - 0.5) * 0.005,
-                smokePos.y + (Math.random() - 0.5) * 0.005,
-                smokePos.z + (Math.random() - 0.5) * 0.005,
-              )
-              const vel = travelDir.clone().negate().multiplyScalar(0.001)
-              scene.add(pSprite)
-              particles.push({ sprite: pSprite, mat: pMat, age: 0, maxAge: 15, kind: 'smoke', velocity: vel, baseSize: sz })
+            // 3 smoke particles, offset behind head
+            for (let p = 0; p < 3; p++) {
+              const smokePos = pos.clone().sub(travelDir.clone().multiplyScalar(0.015 + Math.random() * 0.01))
+              const vel = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
+                .normalize().multiplyScalar(0.001)
+              addParticle(smokePos, vel, 0x666666, 30, 0.01, 0.03, 0.5)
             }
           }
 
+          let impacted = false
           const t0 = performance.now()
 
           const anim: AnimFn = () => {
-            const camera = cameraRef.current
             const t = Math.min((performance.now() - t0) / duration, 1)
             const idx = Math.min(Math.floor(t * PATH_COUNT), PATH_COUNT - 1)
             const currentPos = pathPoints[idx]
             const nextPos = pathPoints[Math.min(idx + 1, PATH_COUNT)]
-
-            // Direction of travel
             const dirVec = nextPos.clone().sub(currentPos)
-            const travelDir = dirVec.lengthSq() > 1e-8
-              ? dirVec.normalize()
-              : currentPos.clone().normalize()
+            const travelDir = dirVec.lengthSq() > 1e-8 ? dirVec.normalize() : currentPos.clone().normalize()
 
-            // Position sprite
-            missileSprite.position.copy(currentPos)
+            if (!impacted) {
+              if (t < 1) {
+                // Move head + light to current path point
+                head.position.copy(currentPos)
+                headLight.position.copy(currentPos)
+                // Grow trail line
+                visitedPts.push(currentPos.clone())
+                if (visitedPts.length >= 2) trailGeo.setFromPoints(visitedPts)
+                // Emit exhaust
+                spawnFlight(currentPos, travelDir)
+              } else {
+                // ── IMPACT ─────────────────────────────────────────────────
+                impacted = true
+                scene.remove(head); headGeo.dispose(); headMat.dispose()
+                scene.remove(headLight)
+                onImpactRef.current?.()
 
-            // Orient sprite: project travel direction into camera space, set 2D rotation
-            if (camera) {
-              const dirWorld = pathPoints[Math.min(idx + 1, PATH_COUNT)].clone()
-                .sub(pathPoints[idx]).normalize()
-              const dirCamera = dirWorld.clone().transformDirection(camera.matrixWorldInverse)
-              const angle = Math.atan2(dirCamera.x, dirCamera.y)
-              spriteMat.rotation = -angle
+                // 1. Flash PointLight — decay via RAF
+                const flashLight = new THREE.PointLight(0xFF4400, 8, 1.5)
+                flashLight.position.copy(impactPoint)
+                scene.add(flashLight)
+                const flashT0 = performance.now()
+                const animFlash = () => {
+                  const fp = Math.min((performance.now() - flashT0) / 400, 1)
+                  flashLight.intensity = 8 * (1 - fp)
+                  if (fp < 1) requestAnimationFrame(animFlash)
+                  else scene.remove(flashLight)
+                }
+                requestAnimationFrame(animFlash)
+
+                // 2. Three staggered expanding rings
+                const ringDefs: [number, number, number][] = [[0, 2, 400], [100, 3, 500], [200, 4, 600]]
+                ringDefs.forEach(([delay, maxScale, dur]) => {
+                  setTimeout(() => {
+                    const rGeo = new THREE.RingGeometry(0.015, 0.04, 32)
+                    const rMat = new THREE.MeshBasicMaterial({ color: 0xFF2233, transparent: true, opacity: 1, side: THREE.DoubleSide })
+                    const ring = new THREE.Mesh(rGeo, rMat)
+                    ring.position.copy(impactPoint)
+                    ring.lookAt(new THREE.Vector3(0, 0, 0))
+                    scene.add(ring)
+                    const rT0 = performance.now()
+                    const animRing = () => {
+                      const rp = Math.min((performance.now() - rT0) / dur, 1)
+                      ring.scale.setScalar(1 + rp * (maxScale - 1))
+                      rMat.opacity = 1 - rp
+                      if (rp < 1) requestAnimationFrame(animRing)
+                      else { scene.remove(ring); rGeo.dispose(); rMat.dispose() }
+                    }
+                    requestAnimationFrame(animRing)
+                  }, delay)
+                })
+
+                // 3. 20 debris particles burst outward
+                for (let d = 0; d < 20; d++) {
+                  const sz = 0.008 + Math.random() * 0.012
+                  const vel = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
+                    .normalize().multiplyScalar(0.002 + Math.random() * 0.005)
+                  addParticle(impactPoint.clone(), vel, debrisColors[Math.floor(Math.random() * 4)], 40, sz, 0, 1)
+                }
+
+                // 4. Scorch mark — fades over 10s
+                const scorchGeo = new THREE.RingGeometry(0, 0.04, 32)
+                const scorchMat = new THREE.MeshBasicMaterial({ color: 0xFF2233, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
+                const scorch = new THREE.Mesh(scorchGeo, scorchMat)
+                scorch.position.copy(impactPoint)
+                scorch.lookAt(new THREE.Vector3(0, 0, 0))
+                scene.add(scorch)
+                const scorchT0 = performance.now()
+                const animScorch = () => {
+                  const sp = Math.min((performance.now() - scorchT0) / 10000, 1)
+                  scorchMat.opacity = 0.6 * (1 - sp)
+                  if (sp < 1) requestAnimationFrame(animScorch)
+                  else { scene.remove(scorch); scorchGeo.dispose(); scorchMat.dispose() }
+                }
+                requestAnimationFrame(animScorch)
+
+                // 5. Fade trail line over 3s then remove
+                const trailT0 = performance.now()
+                const animTrail = () => {
+                  const tp = Math.min((performance.now() - trailT0) / 3000, 1)
+                  trailMat.opacity = 0.4 * (1 - tp)
+                  if (tp < 1) requestAnimationFrame(animTrail)
+                  else { scene.remove(trailLine); trailGeo.dispose(); trailMat.dispose() }
+                }
+                requestAnimationFrame(animTrail)
+
+                // 6. Camera shake 0.3s, intensity 0.08
+                const camRef = cameraRef.current
+                if (camRef) {
+                  const origPos = camRef.position.clone()
+                  const shakeEnd = Date.now() + 300
+                  const shake = () => {
+                    if (Date.now() > shakeEnd) { camRef.position.copy(origPos); return }
+                    camRef.position.x = origPos.x + (Math.random() - 0.5) * 0.08
+                    camRef.position.y = origPos.y + (Math.random() - 0.5) * 0.08
+                    requestAnimationFrame(shake)
+                  }
+                  shake()
+                }
+              }
             }
 
-            // Exhaust tail: offset backward from missile center
-            const tailPos = currentPos.clone().sub(travelDir.clone().multiplyScalar(spriteH * 0.45))
-            spawnExhaust(tailPos, travelDir)
-
-            // Age all particles
+            // ── Update all particles (flight exhaust + impact debris) ─────
             for (let p = particles.length - 1; p >= 0; p--) {
               const particle = particles[p]
-              particle.age++
-              particle.sprite.position.add(particle.velocity)
-              const life = particle.age / particle.maxAge
-              if (particle.kind === 'fire') {
-                particle.mat.opacity = 1 - life
-                particle.mat.color.setRGB(1, Math.max(0, 0.4 - life * 0.4) * 0.5, 0)
-                const sz = particle.baseSize * (1 - life * 0.7)
-                particle.sprite.scale.set(sz, sz, 1)
-              } else {
-                particle.mat.opacity = 0.6 * (1 - life)
-                particle.mat.color.setHex(life > 0.5 ? 0x222222 : 0x444444)
-                const sz = particle.baseSize * (1 + life * 0.5)
-                particle.sprite.scale.set(sz, sz, 1)
-              }
-              if (particle.age >= particle.maxAge) {
-                scene.remove(particle.sprite)
+              particle.life++
+              particle.mesh.position.add(particle.velocity)
+              const lr = particle.life / particle.maxLife
+              const sz = particle.startSize + (particle.endSize - particle.startSize) * lr
+              particle.mesh.scale.setScalar(sz / 0.01)
+              particle.mat.opacity = particle.startOpacity + (particle.endOpacity - particle.startOpacity) * lr
+              if (particle.life >= particle.maxLife) {
+                scene.remove(particle.mesh)
                 particle.mat.dispose()
                 particles.splice(p, 1)
               }
             }
 
-            if (t < 1) return true
-
-            // ── Cleanup ─────────────────────────────────────────────────
-            scene.remove(missileSprite)
-            spriteMat.dispose()
-            texRefCount--
-            if (texRefCount <= 0) missileTex.dispose()
-
-            particles.forEach(({ sprite: ps, mat: pm }) => { scene.remove(ps); pm.dispose() })
-            particles.length = 0
-
-            // ── Notify impact ────────────────────────────────────────────
-            onImpactRef.current?.()
-
-            // ── Flash ────────────────────────────────────────────────────
-            const flash = new THREE.PointLight(0xff2233, 3, 2)
-            flash.position.copy(impactPoint)
-            scene.add(flash)
-            setTimeout(() => scene.remove(flash), 300)
-
-            // ── Impact ring (direct RAF) ─────────────────────────────────
-            const rGeo = new THREE.RingGeometry(0.015, 0.04, 32)
-            const rMat = new THREE.MeshBasicMaterial({
-              color: 0xff2233, transparent: true, opacity: 0.9, side: THREE.DoubleSide,
-            })
-            const ring = new THREE.Mesh(rGeo, rMat)
-            ring.position.copy(impactPoint)
-            ring.lookAt(new THREE.Vector3(0, 0, 0))
-            scene.add(ring)
-
-            const ringStart = Date.now()
-            const animateRing = () => {
-              const progress = (Date.now() - ringStart) / 500
-              if (progress >= 1) { scene.remove(ring); rGeo.dispose(); rMat.dispose(); return }
-              ring.scale.set(progress * 3, progress * 3, 1)
-              rMat.opacity = 1 - progress
-              requestAnimationFrame(animateRing)
+            // Keep running until all particles drain after impact
+            if (impacted && particles.length === 0) {
+              pBaseGeo.dispose()
+              return false
             }
-            animateRing()
-
-            // ── Camera shake (direct RAF) ────────────────────────────────
-            const camForShake = cameraRef.current
-            if (camForShake) {
-              const originalPos = camForShake.position.clone()
-              const shakeEnd = Date.now() + 300
-              const shake = () => {
-                if (Date.now() > shakeEnd) { camForShake.position.copy(originalPos); return }
-                camForShake.position.x = originalPos.x + (Math.random() - 0.5) * 0.1
-                camForShake.position.y = originalPos.y + (Math.random() - 0.5) * 0.1
-                requestAnimationFrame(shake)
-              }
-              shake()
-            }
-
-            return false
+            return true
           }
 
           animsRef.current.push(anim)
