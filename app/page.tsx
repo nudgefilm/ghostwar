@@ -59,6 +59,7 @@ function DamageBar({ pct }: { pct: number }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Home() {
   const globeRef = useRef<GlobeHandle>(null)
+  const launchingRef = useRef(false) // ref guard against double-tap race
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [targetCountry, setTargetCountry] = useState<string | null>(null)
@@ -161,49 +162,54 @@ export default function Home() {
 
   // ── Handle launch ─────────────────────────────────────────────────────────
   const handleLaunch = async () => {
-    if (!player || !targetCountry || isLaunching) return
+    if (!player || !targetCountry || launchingRef.current) return
     const ammo = weaponType === 'nuke' ? nukes : missiles
-    if (ammo < quantity) return
+    if (ammo - quantity < 0) return
 
+    // Synchronously lock via ref to block any concurrent tap before state re-render
+    launchingRef.current = true
     setIsLaunching(true)
 
-    const res = await fetch('/api/launch', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        launcher_id: player.id,
-        launcher_country: player.country_code,
-        target_country: targetCountry,
-        type: weaponType,
-        quantity,
-      }),
-    })
-
-    const data = (await res.json()) as {
-      success?: boolean
-      missile_id?: string
-      arrives_at?: string
-      flight_seconds?: number
-      error?: string
-    }
-
-    if (data.success && data.flight_seconds) {
-      const fromCoords = COUNTRY_COORDS[player.country_code]
-      const toCoords = COUNTRY_COORDS[targetCountry]
-      if (fromCoords && toCoords) {
-        globeRef.current?.launchMissile(
-          fromCoords[0], fromCoords[1],
-          toCoords[0], toCoords[1],
+    try {
+      const res = await fetch('/api/launch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          launcher_id: player.id,
+          launcher_country: player.country_code,
+          target_country: targetCountry,
+          type: weaponType,
           quantity,
-          weaponType,
-          data.flight_seconds * 1000,
-        )
-      }
-      if (weaponType === 'missile') setMissiles(prev => prev - quantity)
-      else setNukes(prev => prev - quantity)
-    }
+        }),
+      })
 
-    setIsLaunching(false)
+      const data = (await res.json()) as {
+        success?: boolean
+        missile_id?: string
+        arrives_at?: string
+        flight_seconds?: number
+        error?: string
+      }
+
+      if (data.success && data.flight_seconds) {
+        const fromCoords = COUNTRY_COORDS[player.country_code]
+        const toCoords = COUNTRY_COORDS[targetCountry]
+        if (fromCoords && toCoords) {
+          globeRef.current?.launchMissile(
+            fromCoords[0], fromCoords[1],
+            toCoords[0], toCoords[1],
+            quantity,
+            weaponType,
+            data.flight_seconds * 1000,
+          )
+        }
+        if (weaponType === 'missile') setMissiles(prev => prev - quantity)
+        else setNukes(prev => prev - quantity)
+      }
+    } finally {
+      launchingRef.current = false
+      setIsLaunching(false)
+    }
   }
 
   // ── Sorted damage rankings ────────────────────────────────────────────────

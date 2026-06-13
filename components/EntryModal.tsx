@@ -142,7 +142,11 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
 
             {/* Error */}
             {error && (
-              <div className="text-[#FF2233] text-[10px] tracking-widest text-center py-1 border border-[#FF2233]/30 bg-[#FF2233]/5">
+              <div className={`text-[10px] tracking-widest text-center py-1.5 border bg-[#FF2233]/5 ${
+                error === 'CALLSIGN TAKEN'
+                  ? 'neon-glow border-[#FF2233] font-bold'
+                  : 'text-[#FF2233] border-[#FF2233]/30'
+              }`}>
                 ⚠ {error}
               </div>
             )}

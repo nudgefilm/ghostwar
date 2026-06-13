@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     ? playerData.nukes_remaining
     : playerData.missiles_remaining
 
-  if (currentAmmo < qty) {
+  if (currentAmmo - qty < 0) {
     return NextResponse.json({ error: 'INSUFFICIENT_AMMO' }, { status: 400 })
   }
 
