@@ -50,6 +50,7 @@ interface GlobeParticle {
   endSize: number
   startOpacity: number
   endOpacity: number
+  gravity: number
 }
 
 export interface GlobeHandle {
@@ -262,10 +263,10 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       if (!scene) return
 
       const isNuke = type === 'nuke'
-      const arcH = isNuke ? 0.6 : 0.35
+      const arcH = isNuke ? 0.25 : 0.15
       const headColor = isNuke ? 0xFF6600 : 0xFF2233
       const fireColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFAA00]
-      const debrisColors = [0xFF4400, 0xFF6600, 0xFFAA00, 0xFF2233]
+      const debrisColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFCC00, 0xFF2233]
 
       // Pre-compute 101 SLERP path points (shared across all staggered missiles)
       const PATH_COUNT = 100
@@ -278,10 +279,10 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       for (let i = 0; i < quantity; i++) {
         setTimeout(() => {
           // ── Glowing head: small sphere + point light ───────────────────
-          const headGeo = new THREE.SphereGeometry(0.012, 8, 8)
+          const headGeo = new THREE.SphereGeometry(0.006, 8, 8)
           const headMat = new THREE.MeshBasicMaterial({ color: headColor })
           const head = new THREE.Mesh(headGeo, headMat)
-          const headLight = new THREE.PointLight(headColor, 2, 0.4)
+          const headLight = new THREE.PointLight(headColor, 1.5, 0.2)
           scene.add(head)
           scene.add(headLight)
 
@@ -304,27 +305,35 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             startSize: number,
             endSize: number,
             startOpacity: number,
+            gravity = 0,
           ) => {
             const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: startOpacity })
             const mesh = new THREE.Mesh(pBaseGeo, mat)
             mesh.position.copy(pos)
             mesh.scale.setScalar(startSize / 0.01)
             scene.add(mesh)
-            particles.push({ mesh, mat, life: 0, maxLife, velocity: vel, startSize, endSize, startOpacity, endOpacity: 0 })
+            particles.push({ mesh, mat, life: 0, maxLife, velocity: vel, startSize, endSize, startOpacity, endOpacity: 0, gravity })
           }
 
           const spawnFlight = (pos: THREE.Vector3, travelDir: THREE.Vector3) => {
-            // 5 fire particles at head
+            // 5 fire particles: velocity = -dir*0.02 ±0.005 spread
             for (let p = 0; p < 5; p++) {
               const sz = 0.008 + Math.random() * 0.007
-              const vel = travelDir.clone().negate().multiplyScalar(0.002 + Math.random() * 0.002)
+              const vel = new THREE.Vector3(
+                -travelDir.x * 0.02 + (Math.random() - 0.5) * 0.005,
+                -travelDir.y * 0.02 + (Math.random() - 0.5) * 0.005,
+                -travelDir.z * 0.02 + (Math.random() - 0.5) * 0.005,
+              )
               addParticle(pos, vel, fireColors[Math.floor(Math.random() * 4)], 15, sz, 0, 1)
             }
             // 3 smoke particles, offset behind head
             for (let p = 0; p < 3; p++) {
               const smokePos = pos.clone().sub(travelDir.clone().multiplyScalar(0.015 + Math.random() * 0.01))
-              const vel = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
-                .normalize().multiplyScalar(0.001)
+              const vel = new THREE.Vector3(
+                -travelDir.x * 0.02 + (Math.random() - 0.5) * 0.005,
+                -travelDir.y * 0.02 + (Math.random() - 0.5) * 0.005,
+                -travelDir.z * 0.02 + (Math.random() - 0.5) * 0.005,
+              )
               addParticle(smokePos, vel, 0x666666, 30, 0.01, 0.03, 0.5)
             }
           }
@@ -334,21 +343,19 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
           const anim: AnimFn = () => {
             const t = Math.min((performance.now() - t0) / duration, 1)
-            const idx = Math.min(Math.floor(t * PATH_COUNT), PATH_COUNT - 1)
-            const currentPos = pathPoints[idx]
+            // Allow idx to reach PATH_COUNT so missile arrives at final point
+            const idx = Math.min(Math.floor(t * PATH_COUNT), PATH_COUNT)
+            const currentPos = pathPoints[Math.min(idx, PATH_COUNT - 1)]
             const nextPos = pathPoints[Math.min(idx + 1, PATH_COUNT)]
             const dirVec = nextPos.clone().sub(currentPos)
             const travelDir = dirVec.lengthSq() > 1e-8 ? dirVec.normalize() : currentPos.clone().normalize()
 
             if (!impacted) {
               if (t < 1) {
-                // Move head + light to current path point
                 head.position.copy(currentPos)
                 headLight.position.copy(currentPos)
-                // Grow trail line
                 visitedPts.push(currentPos.clone())
                 if (visitedPts.length >= 2) trailGeo.setFromPoints(visitedPts)
-                // Emit exhaust
                 spawnFlight(currentPos, travelDir)
               } else {
                 // ── IMPACT ─────────────────────────────────────────────────
@@ -357,25 +364,38 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
                 scene.remove(headLight)
                 onImpactRef.current?.()
 
-                // 1. Flash PointLight — decay via RAF
-                const flashLight = new THREE.PointLight(0xFF4400, 8, 1.5)
+                // 1. Flash: intensity 5, 0.25s
+                const flashLight = new THREE.PointLight(0xFF4400, 5, 1.5)
                 flashLight.position.copy(impactPoint)
                 scene.add(flashLight)
                 const flashT0 = performance.now()
                 const animFlash = () => {
-                  const fp = Math.min((performance.now() - flashT0) / 400, 1)
-                  flashLight.intensity = 8 * (1 - fp)
+                  const fp = Math.min((performance.now() - flashT0) / 250, 1)
+                  flashLight.intensity = 5 * (1 - fp)
                   if (fp < 1) requestAnimationFrame(animFlash)
                   else scene.remove(flashLight)
                 }
                 requestAnimationFrame(animFlash)
 
-                // 2. Three staggered expanding rings
+                // 1b. Secondary warm glow: #FF8800, intensity 2, 0.5s
+                const warmLight = new THREE.PointLight(0xFF8800, 2, 2)
+                warmLight.position.copy(impactPoint)
+                scene.add(warmLight)
+                const warmT0 = performance.now()
+                const animWarm = () => {
+                  const wp = Math.min((performance.now() - warmT0) / 500, 1)
+                  warmLight.intensity = 2 * (1 - wp)
+                  if (wp < 1) requestAnimationFrame(animWarm)
+                  else scene.remove(warmLight)
+                }
+                requestAnimationFrame(animWarm)
+
+                // 2. Three staggered thin rings: soft opacity curve + color shift
                 const ringDefs: [number, number, number][] = [[0, 2, 400], [100, 3, 500], [200, 4, 600]]
                 ringDefs.forEach(([delay, maxScale, dur]) => {
                   setTimeout(() => {
-                    const rGeo = new THREE.RingGeometry(0.015, 0.04, 32)
-                    const rMat = new THREE.MeshBasicMaterial({ color: 0xFF2233, transparent: true, opacity: 1, side: THREE.DoubleSide })
+                    const rGeo = new THREE.RingGeometry(0.025, 0.033, 32)
+                    const rMat = new THREE.MeshBasicMaterial({ color: 0xFF6600, transparent: true, opacity: 0, side: THREE.DoubleSide })
                     const ring = new THREE.Mesh(rGeo, rMat)
                     ring.position.copy(impactPoint)
                     ring.lookAt(new THREE.Vector3(0, 0, 0))
@@ -384,7 +404,14 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
                     const animRing = () => {
                       const rp = Math.min((performance.now() - rT0) / dur, 1)
                       ring.scale.setScalar(1 + rp * (maxScale - 1))
-                      rMat.opacity = 1 - rp
+                      // Opacity: 0→0.6 at 30%→0 at 100%
+                      rMat.opacity = rp < 0.3 ? 0.6 * (rp / 0.3) : 0.6 * (1 - (rp - 0.3) / 0.7)
+                      // Color: #FF6600→#FF2233→#550000
+                      if (rp < 0.5) {
+                        rMat.color.lerpColors(new THREE.Color(0xFF6600), new THREE.Color(0xFF2233), rp * 2)
+                      } else {
+                        rMat.color.lerpColors(new THREE.Color(0xFF2233), new THREE.Color(0x550000), (rp - 0.5) * 2)
+                      }
                       if (rp < 1) requestAnimationFrame(animRing)
                       else { scene.remove(ring); rGeo.dispose(); rMat.dispose() }
                     }
@@ -392,27 +419,48 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
                   }, delay)
                 })
 
-                // 3. 20 debris particles burst outward
-                for (let d = 0; d < 20; d++) {
-                  const sz = 0.008 + Math.random() * 0.012
+                // 3. 35 debris — varied size, speed, colors; 20% white sparks; gravity
+                for (let d = 0; d < 35; d++) {
+                  const sz = 0.004 + Math.random() * 0.014
+                  const isWhite = Math.random() < 0.2
+                  const color = isWhite ? 0xFFFFFF : debrisColors[Math.floor(Math.random() * debrisColors.length)]
+                  const speedMult = 0.5 + Math.random() * 1.5
                   const vel = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
-                    .normalize().multiplyScalar(0.002 + Math.random() * 0.005)
-                  addParticle(impactPoint.clone(), vel, debrisColors[Math.floor(Math.random() * 4)], 40, sz, 0, 1)
+                    .normalize().multiplyScalar((0.002 + Math.random() * 0.005) * speedMult)
+                  addParticle(impactPoint.clone(), vel, color, 40, sz, 0, 1, 0.001)
                 }
 
-                // 4. Scorch mark — fades over 10s
-                const scorchGeo = new THREE.RingGeometry(0, 0.04, 32)
-                const scorchMat = new THREE.MeshBasicMaterial({ color: 0xFF2233, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
-                const scorch = new THREE.Mesh(scorchGeo, scorchMat)
-                scorch.position.copy(impactPoint)
-                scorch.lookAt(new THREE.Vector3(0, 0, 0))
-                scene.add(scorch)
+                // 4. Scorch mark: 8-12 dark spheres scattered on globe surface
+                const impactNorm = impactPoint.clone().normalize()
+                const tUp = Math.abs(impactNorm.y) < 0.9
+                  ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)
+                const tan = impactNorm.clone().cross(tUp).normalize()
+                const btan = impactNorm.clone().cross(tan).normalize()
+                const scorchCount = 8 + Math.floor(Math.random() * 5)
+                const scorchObjs: { mesh: THREE.Mesh; geo: THREE.SphereGeometry; mat: THREE.MeshBasicMaterial; baseOpacity: number }[] = []
+                for (let s = 0; s < scorchCount; s++) {
+                  const sz = 0.008 + Math.random() * 0.012
+                  const baseOpacity = 0.5 + Math.random() * 0.3
+                  const color = Math.random() < 0.5 ? 0x331100 : 0x220000
+                  const geo = new THREE.SphereGeometry(sz, 4, 4)
+                  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: baseOpacity })
+                  const mesh = new THREE.Mesh(geo, mat)
+                  const u = (Math.random() - 0.5) * 0.08
+                  const v = (Math.random() - 0.5) * 0.08
+                  const pos = impactNorm.clone().multiplyScalar(RADIUS)
+                    .add(tan.clone().multiplyScalar(u))
+                    .add(btan.clone().multiplyScalar(v))
+                    .normalize().multiplyScalar(RADIUS)
+                  mesh.position.copy(pos)
+                  scene.add(mesh)
+                  scorchObjs.push({ mesh, geo, mat, baseOpacity })
+                }
                 const scorchT0 = performance.now()
                 const animScorch = () => {
-                  const sp = Math.min((performance.now() - scorchT0) / 10000, 1)
-                  scorchMat.opacity = 0.6 * (1 - sp)
+                  const sp = Math.min((performance.now() - scorchT0) / 8000, 1)
+                  for (const s of scorchObjs) s.mat.opacity = s.baseOpacity * (1 - sp)
                   if (sp < 1) requestAnimationFrame(animScorch)
-                  else { scene.remove(scorch); scorchGeo.dispose(); scorchMat.dispose() }
+                  else { for (const s of scorchObjs) { scene.remove(s.mesh); s.geo.dispose(); s.mat.dispose() } }
                 }
                 requestAnimationFrame(animScorch)
 
@@ -446,6 +494,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             for (let p = particles.length - 1; p >= 0; p--) {
               const particle = particles[p]
               particle.life++
+              if (particle.gravity) particle.velocity.y -= particle.gravity
               particle.mesh.position.add(particle.velocity)
               const lr = particle.life / particle.maxLife
               const sz = particle.startSize + (particle.endSize - particle.startSize) * lr
