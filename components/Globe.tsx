@@ -149,8 +149,8 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS, 64, 64),
         new THREE.MeshPhongMaterial({
-          color: 0x001a0d,
-          opacity: 0.6,
+          color: 0x002b15,
+          opacity: 0.65,
           transparent: true,
           shininess: 30,
         }),
@@ -190,21 +190,15 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controls.maxDistance = 5
     controlsRef.current = controls
 
-    // GeoJSON continent lines — per-ring materials for dynamic front/back opacity
-    const contLines: { mat: THREE.LineBasicMaterial; normal: THREE.Vector3 }[] = []
+    // GeoJSON continent lines
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
     fetch('/ne_110m_land.json')
       .then(r => r.json())
       .then((data: { features: GeoFeature[] }) => {
         const addRing = (ring: number[][]) => {
           if (ring.length < 2) return
           const pts = ring.map(([lng, lat]) => latLngToVec3(lat, lng, RADIUS + 0.001))
-          // Centroid of ring points, normalized = outward sphere normal at ring center
-          const centroid = new THREE.Vector3()
-          for (const p of pts) centroid.add(p)
-          const normal = centroid.divideScalar(pts.length).normalize()
-          const mat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
-          scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat))
-          contLines.push({ mat, normal })
+          scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat))
         }
         for (const { geometry } of data.features) {
           if (geometry.type === 'Polygon') {
@@ -215,17 +209,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         }
       })
       .catch(() => {})
-
-    // Update continent line opacity each frame: front-facing=0.6, back-facing=0.15
-    animsRef.current.push((): boolean => {
-      const cam = cameraRef.current
-      if (!cam || contLines.length === 0) return true
-      const camDir = cam.position.clone().normalize()
-      for (const { mat, normal } of contLines) {
-        mat.opacity = normal.dot(camDir) >= 0 ? 0.6 : 0.15
-      }
-      return true
-    })
 
     // ── InstancedMesh for all missiles ──────────────────────────────────
     // Outer body: thin sleek bar
