@@ -411,9 +411,9 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     composer.addPass(new RenderPass(scene, camera))
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(w, h),
-      1.8,   // strength
-      0.4,   // radius
-      0.1,   // threshold — low value = more things bloom
+      0.6,   // strength
+      0.3,   // radius
+      0.3,   // threshold
     )
     composer.addPass(bloomPass)
     composer.addPass(new OutputPass())
