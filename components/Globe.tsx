@@ -20,7 +20,7 @@ function getMissilePoint(
   fromLat: number, fromLng: number,
   toLat: number, toLng: number,
   t: number,
-  arcHeight = 0.4,
+  arcHeight = 0.35,
 ): THREE.Vector3 {
   const startNorm = latLngToVec3(fromLat, fromLng).normalize()
   const endNorm   = latLngToVec3(toLat, toLng).normalize()
@@ -52,57 +52,55 @@ interface MissileParticle {
 
 function createMissileTexture(isNuke = false): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
-  canvas.width = 64
-  canvas.height = 128
+  canvas.width = 32
+  canvas.height = 80
   const ctx = canvas.getContext('2d')!
 
-  // Main body — metallic gradient cylinder
-  const bodyGrad = ctx.createLinearGradient(0, 0, 64, 0)
+  // Body — narrow light-gray cylinder with subtle metallic sheen
+  const bodyGrad = ctx.createLinearGradient(0, 0, 32, 0)
   bodyGrad.addColorStop(0, '#888888')
-  bodyGrad.addColorStop(0.3, '#FFFFFF')
-  bodyGrad.addColorStop(0.7, '#DDDDDD')
+  bodyGrad.addColorStop(0.3, '#EEEEEE')
+  bodyGrad.addColorStop(0.7, '#CCCCCC')
   bodyGrad.addColorStop(1, '#666666')
   ctx.fillStyle = bodyGrad
-  ctx.fillRect(12, 20, 40, 80)
+  ctx.fillRect(10, 10, 12, 52)
 
-  // Nose cone
-  ctx.fillStyle = '#CCCCCC'
+  // Dark pointed nose cone
+  ctx.fillStyle = '#444444'
   ctx.beginPath()
-  ctx.moveTo(32, 0)
-  ctx.lineTo(52, 20)
-  ctx.lineTo(12, 20)
+  ctx.moveTo(16, 0)
+  ctx.lineTo(22, 10)
+  ctx.lineTo(10, 10)
   ctx.closePath()
   ctx.fill()
 
-  // Wide red stripe
+  // Two thin red stripes
   ctx.fillStyle = '#FF2233'
-  ctx.fillRect(12, 52, 40, 8)
+  ctx.fillRect(10, 28, 12, 2)
+  ctx.fillRect(10, 34, 12, 2)
 
-  // Thin red stripe
-  ctx.fillStyle = '#FF2233'
-  ctx.fillRect(12, 38, 40, 3)
-
-  // Fins
-  ctx.fillStyle = '#AAAAAA'
+  // Small fins at base
+  ctx.fillStyle = '#999999'
   ctx.beginPath()
-  ctx.moveTo(12, 80); ctx.lineTo(0, 110); ctx.lineTo(12, 105)
+  ctx.moveTo(10, 52); ctx.lineTo(5, 65); ctx.lineTo(10, 63)
   ctx.closePath()
   ctx.fill()
   ctx.beginPath()
-  ctx.moveTo(52, 80); ctx.lineTo(64, 110); ctx.lineTo(52, 105)
+  ctx.moveTo(22, 52); ctx.lineTo(27, 65); ctx.lineTo(22, 63)
   ctx.closePath()
   ctx.fill()
 
   // Exhaust nozzle
-  ctx.fillStyle = '#444444'
-  ctx.fillRect(18, 100, 28, 10)
+  ctx.fillStyle = '#333333'
+  ctx.fillRect(12, 62, 8, 4)
 
-  // Nuke variant: darken body, orange stripe
+  // Nuke variant: darken body, orange stripes
   if (isNuke) {
-    ctx.fillStyle = 'rgba(0,0,0,0.5)'
-    ctx.fillRect(12, 20, 40, 80)
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'
+    ctx.fillRect(10, 10, 12, 52)
     ctx.fillStyle = '#FF8800'
-    ctx.fillRect(12, 52, 40, 8)
+    ctx.fillRect(10, 28, 12, 2)
+    ctx.fillRect(10, 34, 12, 2)
   }
 
   return new THREE.CanvasTexture(canvas)
@@ -313,8 +311,8 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       if (!scene) return
 
       const isNuke = type === 'nuke'
-      const spriteW = isNuke ? 0.08 : 0.06
-      const spriteH = isNuke ? 0.2 : 0.15
+      const spriteW = isNuke ? 0.035 : 0.025
+      const spriteH = isNuke ? 0.08 : 0.06
 
       // Pre-compute 101 SLERP path points (shared across all staggered missiles)
       const PATH_COUNT = 100
@@ -339,38 +337,38 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
           const particles: MissileParticle[] = []
 
           const spawnExhaust = (tailPos: THREE.Vector3, travelDir: THREE.Vector3) => {
-            // Fire: 4 per frame — orange→red, 12-frame life
-            for (let p = 0; p < 4; p++) {
-              const sz = 0.01 + Math.random() * 0.01
+            // Fire: 2 per frame — orange→red, 12-frame life, tight spread
+            for (let p = 0; p < 2; p++) {
+              const sz = 0.004 + Math.random() * 0.004
               const pMat = new THREE.SpriteMaterial({ color: 0xff6600, transparent: true, opacity: 1 })
               const pSprite = new THREE.Sprite(pMat)
               pSprite.scale.set(sz, sz, 1)
               pSprite.position.set(
-                tailPos.x + (Math.random() - 0.5) * 0.01,
-                tailPos.y + (Math.random() - 0.5) * 0.01,
-                tailPos.z + (Math.random() - 0.5) * 0.01,
+                tailPos.x + (Math.random() - 0.5) * 0.003,
+                tailPos.y + (Math.random() - 0.5) * 0.003,
+                tailPos.z + (Math.random() - 0.5) * 0.003,
               )
-              const vel = travelDir.clone().negate().multiplyScalar(0.003).add(
-                new THREE.Vector3((Math.random()-0.5)*0.002, (Math.random()-0.5)*0.002, (Math.random()-0.5)*0.002),
+              const vel = travelDir.clone().negate().multiplyScalar(0.002).add(
+                new THREE.Vector3((Math.random()-0.5)*0.001, (Math.random()-0.5)*0.001, (Math.random()-0.5)*0.001),
               )
               scene.add(pSprite)
               particles.push({ sprite: pSprite, mat: pMat, age: 0, maxAge: 12, kind: 'fire', velocity: vel, baseSize: sz })
             }
-            // Smoke: 2 per frame — gray, grows, 20-frame life
-            for (let p = 0; p < 2; p++) {
-              const sz = 0.015 + Math.random() * 0.015
+            // Smoke: 1 per frame — gray, grows, 15-frame life
+            {
+              const sz = 0.006 + Math.random() * 0.006
               const pMat = new THREE.SpriteMaterial({ color: 0x444444, transparent: true, opacity: 0.6 })
               const pSprite = new THREE.Sprite(pMat)
               pSprite.scale.set(sz, sz, 1)
               const smokePos = tailPos.clone().sub(travelDir.clone().multiplyScalar(spriteH * 0.15))
               pSprite.position.set(
-                smokePos.x + (Math.random() - 0.5) * 0.015,
-                smokePos.y + (Math.random() - 0.5) * 0.015,
-                smokePos.z + (Math.random() - 0.5) * 0.015,
+                smokePos.x + (Math.random() - 0.5) * 0.005,
+                smokePos.y + (Math.random() - 0.5) * 0.005,
+                smokePos.z + (Math.random() - 0.5) * 0.005,
               )
               const vel = travelDir.clone().negate().multiplyScalar(0.001)
               scene.add(pSprite)
-              particles.push({ sprite: pSprite, mat: pMat, age: 0, maxAge: 20, kind: 'smoke', velocity: vel, baseSize: sz })
+              particles.push({ sprite: pSprite, mat: pMat, age: 0, maxAge: 15, kind: 'smoke', velocity: vel, baseSize: sz })
             }
           }
 
@@ -392,10 +390,13 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             // Position sprite
             missileSprite.position.copy(currentPos)
 
-            // Orient sprite: rotate material so nose aligns with travel direction in screen space
+            // Orient sprite: project travel direction into camera space, set 2D rotation
             if (camera) {
-              const camDir = travelDir.clone().transformDirection(camera.matrixWorldInverse)
-              spriteMat.rotation = Math.atan2(-camDir.x, camDir.y)
+              const dirWorld = pathPoints[Math.min(idx + 1, PATH_COUNT)].clone()
+                .sub(pathPoints[idx]).normalize()
+              const dirCamera = dirWorld.clone().transformDirection(camera.matrixWorldInverse)
+              const angle = Math.atan2(dirCamera.x, dirCamera.y)
+              spriteMat.rotation = -angle
             }
 
             // Exhaust tail: offset backward from missile center
