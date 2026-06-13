@@ -119,7 +119,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     sceneRef.current = scene
 
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100)
-    camera.position.z = 2.5
+    camera.position.z = 2.8
     cameraRef.current = camera
 
     // Lighting
@@ -131,42 +131,42 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     pl2.position.set(2, -2, -1)
     scene.add(pl2)
 
-    // Atmosphere glow — subtle outer rim
+    // Atmosphere glow
     scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS * 1.02, 32, 32),
         new THREE.MeshBasicMaterial({
           color: 0x00ff88,
           transparent: true,
-          opacity: 0.05,
+          opacity: 0.06,
           side: THREE.BackSide,
         }),
       ),
     )
 
-    // Base sphere — dark background to prevent bloom bleed
+    // Base sphere
     scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS, 64, 64),
         new THREE.MeshPhongMaterial({
           color: 0x001a0d,
-          opacity: 0.55,
+          opacity: 0.6,
           transparent: true,
           shininess: 30,
         }),
       ),
     )
 
-    // Wireframe overlay — very faint
+    // Wireframe overlay
     scene.add(
       new THREE.LineSegments(
         new THREE.WireframeGeometry(new THREE.SphereGeometry(RADIUS, 32, 32)),
-        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.08, transparent: true }),
+        new THREE.LineBasicMaterial({ color: 0x1a4a2a, opacity: 0.4, transparent: true }),
       ),
     )
 
     // Graticule — lat/lon grid every 30°
-    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.06, transparent: true })
+    const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.15, transparent: true })
     ;[-60, -30, 0, 30, 60].forEach(lat => {
       const pts = Array.from({ length: 65 }, (_, i) =>
         latLngToVec3(lat, (i / 64) * 360 - 180, RADIUS + 0.002),
@@ -188,7 +188,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controls.dampingFactor = 0.05
     controls.minDistance = 1.5
     controls.maxDistance = 5
-    controls.target.set(0, 0.18, 0)
     controlsRef.current = controls
 
     // GeoJSON continent lines — per-ring materials for dynamic front/back opacity
