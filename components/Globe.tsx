@@ -3,10 +3,6 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 
 const RADIUS = 1
 const MAX_MISSILES = 20
@@ -406,25 +402,13 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       }
     }
 
-    // EffectComposer with bloom
-    const composer = new EffectComposer(renderer)
-    composer.addPass(new RenderPass(scene, camera))
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(w, h),
-      0.6,   // strength
-      0.3,   // radius
-      0.3,   // threshold
-    )
-    composer.addPass(bloomPass)
-    composer.addPass(new OutputPass())
-
     // Render loop
     let animId: number
     const loop = () => {
       animId = requestAnimationFrame(loop)
       controls.update()
       animsRef.current = animsRef.current.filter(fn => fn())
-      composer.render()
+      renderer.render(scene, camera)
     }
     loop()
 
@@ -520,7 +504,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       camera.aspect = nw / nh
       camera.updateProjectionMatrix()
       renderer.setSize(nw, nh)
-      composer.setSize(nw, nh)
     }
     window.addEventListener('resize', onResize)
 
