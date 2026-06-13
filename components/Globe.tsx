@@ -5,6 +5,9 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 
 const RADIUS = 1
+const MAX_MISSILES = 20
+const PATH_COUNT = 100
+const TRAIL_SIZE = 15
 
 function latLngToVec3(lat: number, lng: number, r = RADIUS): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180)
@@ -20,14 +23,12 @@ function getMissilePoint(
   fromLat: number, fromLng: number,
   toLat: number, toLng: number,
   t: number,
-  arcHeight = 0.35,
+  arcHeight = 0.18,
 ): THREE.Vector3 {
   const startNorm = latLngToVec3(fromLat, fromLng).normalize()
   const endNorm   = latLngToVec3(toLat, toLng).normalize()
-  // Approximate SLERP: lerp then normalize keeps the path on the sphere
   const slerped = startNorm.clone().lerp(endNorm, t)
   if (slerped.lengthSq() < 1e-8) {
-    // Near-antipodal fallback: use a perpendicular at the midpoint
     return startNorm.clone().cross(new THREE.Vector3(0, 1, 0)).normalize()
       .multiplyScalar(RADIUS + arcHeight)
   }
@@ -40,17 +41,20 @@ function easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
 }
 
-interface GlobeParticle {
-  mesh: THREE.Mesh
-  mat: THREE.MeshBasicMaterial
-  life: number
-  maxLife: number
-  velocity: THREE.Vector3
-  startSize: number
-  endSize: number
-  startOpacity: number
-  endOpacity: number
-  gravity: number
+interface MissileState {
+  pathPoints: THREE.Vector3[]
+  flightMs: number
+  startTime: number
+  instanceId: number
+  type: 'missile' | 'nuke'
+  active: boolean
+  trailHistory: THREE.Vector3[]
+  trailLine: THREE.Line
+  trailGeo: THREE.BufferGeometry
+  trailMat: THREE.LineBasicMaterial
+  trailPositions: Float32Array
+  trailColors: Float32Array
+  impactPoint: THREE.Vector3
 }
 
 export interface GlobeHandle {
@@ -90,6 +94,10 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
   const onImpactRef = useRef(onImpact)
   useEffect(() => { onImpactRef.current = onImpact }, [onImpact])
 
+  const missileInstancesRef = useRef<THREE.InstancedMesh | null>(null)
+  const activeMissilesRef = useRef<MissileState[]>([])
+  const freeSlotsRef = useRef<number[]>([])
+
   useEffect(() => {
     const mount = mountRef.current
     if (!mount) return
@@ -118,7 +126,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     pl2.position.set(2, -2, -1)
     scene.add(pl2)
 
-    // Atmosphere glow — BackSide renders inward, visible as outer halo
+    // Atmosphere glow
     scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS * 1.02, 32, 32),
@@ -131,7 +139,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       ),
     )
 
-    // Base sphere — solid dark backdrop for continent lines
+    // Base sphere
     scene.add(
       new THREE.Mesh(
         new THREE.SphereGeometry(RADIUS, 64, 64),
@@ -154,14 +162,12 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
     // Graticule — lat/lon grid every 30°
     const gratMat = new THREE.LineBasicMaterial({ color: 0x003300, opacity: 0.15, transparent: true })
-    // Latitude lines
     ;[-60, -30, 0, 30, 60].forEach(lat => {
       const pts = Array.from({ length: 65 }, (_, i) =>
         latLngToVec3(lat, (i / 64) * 360 - 180, RADIUS + 0.002),
       )
       scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), gratMat))
     })
-    // Longitude lines
     ;[-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180].forEach(lng => {
       const pts = Array.from({ length: 33 }, (_, i) =>
         latLngToVec3((i / 32) * 180 - 90, lng, RADIUS + 0.002),
@@ -181,7 +187,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
     // GeoJSON continent lines
     const lineMat = new THREE.LineBasicMaterial({ color: 0x00ff88, opacity: 0.6, transparent: true })
-
     fetch('/ne_110m_land.json')
       .then(r => r.json())
       .then((data: { features: GeoFeature[] }) => {
@@ -200,6 +205,183 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       })
       .catch(() => {})
 
+    // ── InstancedMesh for all missiles ──────────────────────────────────
+    const missileGeo = new THREE.PlaneGeometry(0.008, 0.06)
+    const missileMat = new THREE.MeshBasicMaterial({
+      color: 0xFF4400,
+      transparent: true,
+      opacity: 0.9,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const missileInstances = new THREE.InstancedMesh(missileGeo, missileMat, MAX_MISSILES)
+    missileInstances.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    const zeroScaleM = new THREE.Matrix4().makeScale(0, 0, 0)
+    freeSlotsRef.current = []
+    for (let si = 0; si < MAX_MISSILES; si++) {
+      missileInstances.setMatrixAt(si, zeroScaleM)
+      freeSlotsRef.current.push(si)
+    }
+    missileInstances.instanceMatrix.needsUpdate = true
+    scene.add(missileInstances)
+    missileInstancesRef.current = missileInstances
+
+    // ── Explosion trigger ────────────────────────────────────────────────
+    const debrisColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFCC00, 0xFF2233]
+
+    const triggerExplosion = (m: MissileState) => {
+      const ip = m.impactPoint
+      onImpactRef.current?.()
+
+      // Flash: intensity 5, 0.25s
+      const flashLight = new THREE.PointLight(0xFF4400, 5, 1.5)
+      flashLight.position.copy(ip)
+      scene.add(flashLight)
+      const flashT0 = performance.now()
+      const animFlash = () => {
+        const fp = Math.min((performance.now() - flashT0) / 250, 1)
+        flashLight.intensity = 5 * (1 - fp)
+        if (fp < 1) requestAnimationFrame(animFlash)
+        else scene.remove(flashLight)
+      }
+      requestAnimationFrame(animFlash)
+
+      // Warm glow: #FF8800, intensity 2, 0.5s
+      const warmLight = new THREE.PointLight(0xFF8800, 2, 2)
+      warmLight.position.copy(ip)
+      scene.add(warmLight)
+      const warmT0 = performance.now()
+      const animWarm = () => {
+        const wp = Math.min((performance.now() - warmT0) / 500, 1)
+        warmLight.intensity = 2 * (1 - wp)
+        if (wp < 1) requestAnimationFrame(animWarm)
+        else scene.remove(warmLight)
+      }
+      requestAnimationFrame(animWarm)
+
+      // Shockwave rings: thin, soft opacity curve, color shift
+      const ringDefs: [number, number, number][] = [[0, 2, 400], [100, 3, 500], [200, 4, 600]]
+      ringDefs.forEach(([delay, maxScale, dur]) => {
+        setTimeout(() => {
+          const rGeo = new THREE.RingGeometry(0.025, 0.033, 32)
+          const rMat = new THREE.MeshBasicMaterial({ color: 0xFF6600, transparent: true, opacity: 0, side: THREE.DoubleSide })
+          const ring = new THREE.Mesh(rGeo, rMat)
+          ring.position.copy(ip)
+          ring.lookAt(new THREE.Vector3(0, 0, 0))
+          scene.add(ring)
+          const rT0 = performance.now()
+          const animRing = () => {
+            const rp = Math.min((performance.now() - rT0) / dur, 1)
+            ring.scale.setScalar(1 + rp * (maxScale - 1))
+            rMat.opacity = rp < 0.3 ? 0.6 * (rp / 0.3) : 0.6 * (1 - (rp - 0.3) / 0.7)
+            if (rp < 0.5) {
+              rMat.color.lerpColors(new THREE.Color(0xFF6600), new THREE.Color(0xFF2233), rp * 2)
+            } else {
+              rMat.color.lerpColors(new THREE.Color(0xFF2233), new THREE.Color(0x550000), (rp - 0.5) * 2)
+            }
+            if (rp < 1) requestAnimationFrame(animRing)
+            else { scene.remove(ring); rGeo.dispose(); rMat.dispose() }
+          }
+          requestAnimationFrame(animRing)
+        }, delay)
+      })
+
+      // Debris: 35 particles, varied size/speed, 20% white sparks, gravity
+      const debrisBase = new THREE.SphereGeometry(0.01, 4, 4)
+      type DebrisP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; vel: THREE.Vector3; life: number; maxLife: number; startSz: number; gravity: number }
+      const debrisList: DebrisP[] = []
+      for (let d = 0; d < 35; d++) {
+        const sz = 0.004 + Math.random() * 0.014
+        const isWhite = Math.random() < 0.2
+        const color = isWhite ? 0xFFFFFF : debrisColors[Math.floor(Math.random() * debrisColors.length)]
+        const speedMult = 0.5 + Math.random() * 1.5
+        const vel = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)
+          .normalize().multiplyScalar((0.002 + Math.random() * 0.005) * speedMult)
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 })
+        const mesh = new THREE.Mesh(debrisBase, mat)
+        mesh.position.copy(ip)
+        mesh.scale.setScalar(sz / 0.01)
+        scene.add(mesh)
+        debrisList.push({ mesh, mat, vel, life: 0, maxLife: 40, startSz: sz, gravity: 0.001 })
+      }
+      const animDebris = () => {
+        for (let d = debrisList.length - 1; d >= 0; d--) {
+          const deb = debrisList[d]
+          deb.life++
+          deb.vel.y -= deb.gravity
+          deb.mesh.position.add(deb.vel)
+          const lr = deb.life / deb.maxLife
+          deb.mesh.scale.setScalar((deb.startSz * (1 - lr)) / 0.01)
+          deb.mat.opacity = 1 - lr
+          if (deb.life >= deb.maxLife) {
+            scene.remove(deb.mesh)
+            deb.mat.dispose()
+            debrisList.splice(d, 1)
+          }
+        }
+        if (debrisList.length > 0) requestAnimationFrame(animDebris)
+        else debrisBase.dispose()
+      }
+      requestAnimationFrame(animDebris)
+
+      // Scorch mark: 8-12 dark spheres scattered on globe surface
+      const impactNorm = ip.clone().normalize()
+      const tUp = Math.abs(impactNorm.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)
+      const tan = impactNorm.clone().cross(tUp).normalize()
+      const btan = impactNorm.clone().cross(tan).normalize()
+      const scorchCount = 8 + Math.floor(Math.random() * 5)
+      const scorchObjs: { mesh: THREE.Mesh; geo: THREE.SphereGeometry; mat: THREE.MeshBasicMaterial; baseOpacity: number }[] = []
+      for (let s = 0; s < scorchCount; s++) {
+        const sz = 0.008 + Math.random() * 0.012
+        const baseOpacity = 0.5 + Math.random() * 0.3
+        const color = Math.random() < 0.5 ? 0x331100 : 0x220000
+        const geo = new THREE.SphereGeometry(sz, 4, 4)
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: baseOpacity })
+        const mesh = new THREE.Mesh(geo, mat)
+        const u = (Math.random() - 0.5) * 0.08
+        const v = (Math.random() - 0.5) * 0.08
+        const pos = impactNorm.clone().multiplyScalar(RADIUS)
+          .add(tan.clone().multiplyScalar(u))
+          .add(btan.clone().multiplyScalar(v))
+          .normalize().multiplyScalar(RADIUS)
+        mesh.position.copy(pos)
+        scene.add(mesh)
+        scorchObjs.push({ mesh, geo, mat, baseOpacity })
+      }
+      const scorchT0 = performance.now()
+      const animScorch = () => {
+        const sp = Math.min((performance.now() - scorchT0) / 8000, 1)
+        for (const s of scorchObjs) s.mat.opacity = s.baseOpacity * (1 - sp)
+        if (sp < 1) requestAnimationFrame(animScorch)
+        else { for (const s of scorchObjs) { scene.remove(s.mesh); s.geo.dispose(); s.mat.dispose() } }
+      }
+      requestAnimationFrame(animScorch)
+
+      // Fade trail line over 2s
+      const trailT0 = performance.now()
+      const animTrail = () => {
+        const tp = Math.min((performance.now() - trailT0) / 2000, 1)
+        m.trailMat.opacity = 0.9 * (1 - tp)
+        if (tp < 1) requestAnimationFrame(animTrail)
+        else { scene.remove(m.trailLine); m.trailGeo.dispose(); m.trailMat.dispose() }
+      }
+      requestAnimationFrame(animTrail)
+
+      // Camera shake 0.3s
+      const cam = cameraRef.current
+      if (cam) {
+        const origPos = cam.position.clone()
+        const shakeEnd = Date.now() + 300
+        const shake = () => {
+          if (Date.now() > shakeEnd) { cam.position.copy(origPos); return }
+          cam.position.x = origPos.x + (Math.random() - 0.5) * 0.08
+          cam.position.y = origPos.y + (Math.random() - 0.5) * 0.08
+          requestAnimationFrame(shake)
+        }
+        shake()
+      }
+    }
+
     // Render loop
     let animId: number
     const loop = () => {
@@ -209,6 +391,71 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       renderer.render(scene, camera)
     }
     loop()
+
+    // ── Persistent missile updater ────────────────────────────────────────
+    const tmpMatrix = new THREE.Matrix4()
+    const tmpQ = new THREE.Quaternion()
+    const tmpScale = new THREE.Vector3(1, 1, 1)
+    const upVec = new THREE.Vector3(0, 1, 0)
+    const axisX = new THREE.Vector3(1, 0, 0)
+
+    animsRef.current.push((): boolean => {
+      const instances = missileInstancesRef.current
+      if (!instances) return true
+
+      const now = Date.now()
+      let dirty = false
+
+      for (let mi = activeMissilesRef.current.length - 1; mi >= 0; mi--) {
+        const m = activeMissilesRef.current[mi]
+        const progress = Math.min((now - m.startTime) / m.flightMs, 1)
+        const idx = Math.min(Math.floor(progress * PATH_COUNT), PATH_COUNT - 1)
+        const currentPos = m.pathPoints[idx]
+        const nextPos = m.pathPoints[Math.min(idx + 1, PATH_COUNT)]
+        const dirVec = nextPos.clone().sub(currentPos)
+        const dir = dirVec.lengthSq() > 1e-8 ? dirVec.normalize() : currentPos.clone().normalize()
+
+        if (progress < 1) {
+          // Orient plane to face direction of travel
+          const cosA = upVec.dot(dir)
+          if (cosA < -0.9999) {
+            tmpQ.setFromAxisAngle(axisX, Math.PI)
+          } else {
+            tmpQ.setFromUnitVectors(upVec, dir)
+          }
+          tmpMatrix.compose(currentPos, tmpQ, tmpScale)
+          instances.setMatrixAt(m.instanceId, tmpMatrix)
+          dirty = true
+
+          // Sliding trail: newest at index 0, oldest at tail
+          m.trailHistory.unshift(currentPos.clone())
+          if (m.trailHistory.length > TRAIL_SIZE) m.trailHistory.pop()
+          const hn = m.trailHistory.length
+          for (let h = 0; h < hn; h++) {
+            const brightness = hn > 1 ? 1 - h / (hn - 1) : 1
+            m.trailPositions[h * 3]     = m.trailHistory[h].x
+            m.trailPositions[h * 3 + 1] = m.trailHistory[h].y
+            m.trailPositions[h * 3 + 2] = m.trailHistory[h].z
+            m.trailColors[h * 3]     = brightness
+            m.trailColors[h * 3 + 1] = brightness * 0.4
+            m.trailColors[h * 3 + 2] = 0
+          }
+          m.trailGeo.setDrawRange(0, hn)
+          m.trailGeo.attributes.position.needsUpdate = true
+          m.trailGeo.attributes.color.needsUpdate = true
+        } else {
+          // Impact: hide instance, return slot, trigger explosion
+          instances.setMatrixAt(m.instanceId, zeroScaleM)
+          dirty = true
+          freeSlotsRef.current.push(m.instanceId)
+          activeMissilesRef.current.splice(mi, 1)
+          triggerExplosion(m)
+        }
+      }
+
+      if (dirty) instances.instanceMatrix.needsUpdate = true
+      return true
+    })
 
     const onResize = () => {
       const nw = mount.clientWidth
@@ -224,6 +471,8 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       window.removeEventListener('resize', onResize)
       controls.dispose()
       renderer.dispose()
+      activeMissilesRef.current = []
+      freeSlotsRef.current = []
       if (mount.contains(renderer.domElement)) mount.removeChild(renderer.domElement)
     }
   }, [])
@@ -238,7 +487,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const startDir = camera.position.clone().normalize()
       const endDir = latLngToVec3(lat, lng).normalize()
 
-      // Quaternion SLERP: rotate around globe surface, not through it
       const rotQ = new THREE.Quaternion().setFromUnitVectors(startDir, endDir)
       const idQ = new THREE.Quaternion()
       const t0 = performance.now()
@@ -262,281 +510,56 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const scene = sceneRef.current
       if (!scene) return
 
-      const isNuke = type === 'nuke'
-      const arcH = isNuke ? 0.25 : 0.15
-      const headColor = isNuke ? 0xFF6600 : 0xFF2233
-      const fireColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFAA00]
-      const debrisColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFCC00, 0xFF2233]
+      const arcH = type === 'nuke' ? 0.28 : 0.18
 
-      // Pre-compute 101 SLERP path points (shared across all staggered missiles)
-      const PATH_COUNT = 100
-      const pathPoints: THREE.Vector3[] = []
+      // Pre-compute shared base path (PATH_COUNT + 1 points, index 0=launch, PATH_COUNT=impact)
+      const basePath: THREE.Vector3[] = []
       for (let pi = 0; pi <= PATH_COUNT; pi++) {
-        pathPoints.push(getMissilePoint(fromLat, fromLng, toLat, toLng, pi / PATH_COUNT, arcH))
+        basePath.push(getMissilePoint(fromLat, fromLng, toLat, toLng, pi / PATH_COUNT, arcH))
       }
-      const impactPoint = pathPoints[PATH_COUNT]
 
       for (let i = 0; i < quantity; i++) {
         setTimeout(() => {
-          // ── Glowing head: small sphere + point light ───────────────────
-          const headGeo = new THREE.SphereGeometry(0.006, 8, 8)
-          const headMat = new THREE.MeshBasicMaterial({ color: headColor })
-          const head = new THREE.Mesh(headGeo, headMat)
-          const headLight = new THREE.PointLight(headColor, 1.5, 0.2)
-          scene.add(head)
-          scene.add(headLight)
+          const slot = freeSlotsRef.current.pop()
+          if (slot === undefined) return // all 20 slots occupied
 
-          // ── History trail line — last 30 positions, orange→black fade ──
-          const HISTORY_SIZE = 30
-          const historyPts: THREE.Vector3[] = []
-          const histPositions = new Float32Array(HISTORY_SIZE * 3)
-          const histColors = new Float32Array(HISTORY_SIZE * 3)
-          const histGeo = new THREE.BufferGeometry()
-          histGeo.setAttribute('position', new THREE.BufferAttribute(histPositions, 3))
-          histGeo.setAttribute('color', new THREE.BufferAttribute(histColors, 3))
-          histGeo.setDrawRange(0, 0)
-          const histMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })
-          const histLine = new THREE.Line(histGeo, histMat)
-          scene.add(histLine)
-
-          // ── Particle pool — shared base geometry ───────────────────────
-          const pBaseGeo = new THREE.SphereGeometry(0.01, 4, 4)
-          const particles: GlobeParticle[] = []
-
-          const addParticle = (
-            pos: THREE.Vector3,
-            vel: THREE.Vector3,
-            color: number,
-            maxLife: number,
-            startSize: number,
-            endSize: number,
-            startOpacity: number,
-            gravity = 0,
-          ) => {
-            const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: startOpacity })
-            const mesh = new THREE.Mesh(pBaseGeo, mat)
-            mesh.position.copy(pos)
-            mesh.scale.setScalar(startSize / 0.01)
-            scene.add(mesh)
-            particles.push({ mesh, mat, life: 0, maxLife, velocity: vel, startSize, endSize, startOpacity, endOpacity: 0, gravity })
-          }
-
-          const fireExhaustColors = [0xFFFFFF, 0xFFAA00, 0xFF4400]
-          const spawnFlight = (pos: THREE.Vector3, travelDir: THREE.Vector3) => {
-            // 4 fire particles: bright, short-lived, fast backward
-            for (let p = 0; p < 4; p++) {
-              const sz = 0.006 + Math.random() * 0.004
-              const vel = new THREE.Vector3(
-                -travelDir.x * 0.025 + (Math.random() - 0.5) * 0.003,
-                -travelDir.y * 0.025 + (Math.random() - 0.5) * 0.003,
-                -travelDir.z * 0.025 + (Math.random() - 0.5) * 0.003,
+          // Small random offset per missile for quantity > 1
+          const offset = i === 0
+            ? new THREE.Vector3()
+            : new THREE.Vector3(
+                (Math.random() - 0.5) * 0.02,
+                (Math.random() - 0.5) * 0.02,
+                (Math.random() - 0.5) * 0.02,
               )
-              addParticle(pos.clone(), vel, fireExhaustColors[Math.floor(Math.random() * 3)], 12, sz, 0, 1)
-            }
-            // 3 smoke particles: slower velocity + longer life = visible trail length
-            for (let p = 0; p < 3; p++) {
-              const smokePos = pos.clone().sub(travelDir.clone().multiplyScalar(0.02))
-              const vel = new THREE.Vector3(
-                -travelDir.x * 0.018 + (Math.random() - 0.5) * 0.008,
-                -travelDir.y * 0.018 + (Math.random() - 0.5) * 0.008,
-                -travelDir.z * 0.018 + (Math.random() - 0.5) * 0.008,
-              )
-              addParticle(smokePos, vel, Math.random() < 0.5 ? 0xAAAAAA : 0x555555, 40, 0.008, 0.025, 0.7)
-            }
-          }
+          const pathPoints = basePath.map(p => p.clone().add(offset))
+          const impactPoint = pathPoints[PATH_COUNT]
 
-          let impacted = false
-          const t0 = performance.now()
+          // Per-missile trail line with vertex colors
+          const trailPositions = new Float32Array(TRAIL_SIZE * 3)
+          const trailColors = new Float32Array(TRAIL_SIZE * 3)
+          const trailGeo = new THREE.BufferGeometry()
+          trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3))
+          trailGeo.setAttribute('color', new THREE.BufferAttribute(trailColors, 3))
+          trailGeo.setDrawRange(0, 0)
+          const trailMat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9 })
+          const trailLine = new THREE.Line(trailGeo, trailMat)
+          scene.add(trailLine)
 
-          const anim: AnimFn = () => {
-            const t = Math.min((performance.now() - t0) / duration, 1)
-            // Allow idx to reach PATH_COUNT so missile arrives at final point
-            const idx = Math.min(Math.floor(t * PATH_COUNT), PATH_COUNT)
-            const currentPos = pathPoints[Math.min(idx, PATH_COUNT - 1)]
-            const nextPos = pathPoints[Math.min(idx + 1, PATH_COUNT)]
-            const dirVec = nextPos.clone().sub(currentPos)
-            const travelDir = dirVec.lengthSq() > 1e-8 ? dirVec.normalize() : currentPos.clone().normalize()
-
-            if (!impacted) {
-              if (t < 1) {
-                head.position.copy(currentPos)
-                headLight.position.copy(currentPos)
-                // Update history trail: sliding window of 30 points, orange head → black tail
-                historyPts.push(currentPos.clone())
-                if (historyPts.length > HISTORY_SIZE) historyPts.shift()
-                const hn = historyPts.length
-                for (let h = 0; h < hn; h++) {
-                  const ratio = hn > 1 ? h / (hn - 1) : 1
-                  histPositions[h * 3]     = historyPts[h].x
-                  histPositions[h * 3 + 1] = historyPts[h].y
-                  histPositions[h * 3 + 2] = historyPts[h].z
-                  histColors[h * 3]     = ratio * 1.0
-                  histColors[h * 3 + 1] = ratio * 0.4
-                  histColors[h * 3 + 2] = 0
-                }
-                histGeo.setDrawRange(0, hn)
-                histGeo.attributes.position.needsUpdate = true
-                histGeo.attributes.color.needsUpdate = true
-                spawnFlight(currentPos, travelDir)
-              } else {
-                // ── IMPACT ─────────────────────────────────────────────────
-                impacted = true
-                scene.remove(head); headGeo.dispose(); headMat.dispose()
-                scene.remove(headLight)
-                onImpactRef.current?.()
-
-                // 1. Flash: intensity 5, 0.25s
-                const flashLight = new THREE.PointLight(0xFF4400, 5, 1.5)
-                flashLight.position.copy(impactPoint)
-                scene.add(flashLight)
-                const flashT0 = performance.now()
-                const animFlash = () => {
-                  const fp = Math.min((performance.now() - flashT0) / 250, 1)
-                  flashLight.intensity = 5 * (1 - fp)
-                  if (fp < 1) requestAnimationFrame(animFlash)
-                  else scene.remove(flashLight)
-                }
-                requestAnimationFrame(animFlash)
-
-                // 1b. Secondary warm glow: #FF8800, intensity 2, 0.5s
-                const warmLight = new THREE.PointLight(0xFF8800, 2, 2)
-                warmLight.position.copy(impactPoint)
-                scene.add(warmLight)
-                const warmT0 = performance.now()
-                const animWarm = () => {
-                  const wp = Math.min((performance.now() - warmT0) / 500, 1)
-                  warmLight.intensity = 2 * (1 - wp)
-                  if (wp < 1) requestAnimationFrame(animWarm)
-                  else scene.remove(warmLight)
-                }
-                requestAnimationFrame(animWarm)
-
-                // 2. Three staggered thin rings: soft opacity curve + color shift
-                const ringDefs: [number, number, number][] = [[0, 2, 400], [100, 3, 500], [200, 4, 600]]
-                ringDefs.forEach(([delay, maxScale, dur]) => {
-                  setTimeout(() => {
-                    const rGeo = new THREE.RingGeometry(0.025, 0.033, 32)
-                    const rMat = new THREE.MeshBasicMaterial({ color: 0xFF6600, transparent: true, opacity: 0, side: THREE.DoubleSide })
-                    const ring = new THREE.Mesh(rGeo, rMat)
-                    ring.position.copy(impactPoint)
-                    ring.lookAt(new THREE.Vector3(0, 0, 0))
-                    scene.add(ring)
-                    const rT0 = performance.now()
-                    const animRing = () => {
-                      const rp = Math.min((performance.now() - rT0) / dur, 1)
-                      ring.scale.setScalar(1 + rp * (maxScale - 1))
-                      // Opacity: 0→0.6 at 30%→0 at 100%
-                      rMat.opacity = rp < 0.3 ? 0.6 * (rp / 0.3) : 0.6 * (1 - (rp - 0.3) / 0.7)
-                      // Color: #FF6600→#FF2233→#550000
-                      if (rp < 0.5) {
-                        rMat.color.lerpColors(new THREE.Color(0xFF6600), new THREE.Color(0xFF2233), rp * 2)
-                      } else {
-                        rMat.color.lerpColors(new THREE.Color(0xFF2233), new THREE.Color(0x550000), (rp - 0.5) * 2)
-                      }
-                      if (rp < 1) requestAnimationFrame(animRing)
-                      else { scene.remove(ring); rGeo.dispose(); rMat.dispose() }
-                    }
-                    requestAnimationFrame(animRing)
-                  }, delay)
-                })
-
-                // 3. 35 debris — varied size, speed, colors; 20% white sparks; gravity
-                for (let d = 0; d < 35; d++) {
-                  const sz = 0.004 + Math.random() * 0.014
-                  const isWhite = Math.random() < 0.2
-                  const color = isWhite ? 0xFFFFFF : debrisColors[Math.floor(Math.random() * debrisColors.length)]
-                  const speedMult = 0.5 + Math.random() * 1.5
-                  const vel = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5)
-                    .normalize().multiplyScalar((0.002 + Math.random() * 0.005) * speedMult)
-                  addParticle(impactPoint.clone(), vel, color, 40, sz, 0, 1, 0.001)
-                }
-
-                // 4. Scorch mark: 8-12 dark spheres scattered on globe surface
-                const impactNorm = impactPoint.clone().normalize()
-                const tUp = Math.abs(impactNorm.y) < 0.9
-                  ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)
-                const tan = impactNorm.clone().cross(tUp).normalize()
-                const btan = impactNorm.clone().cross(tan).normalize()
-                const scorchCount = 8 + Math.floor(Math.random() * 5)
-                const scorchObjs: { mesh: THREE.Mesh; geo: THREE.SphereGeometry; mat: THREE.MeshBasicMaterial; baseOpacity: number }[] = []
-                for (let s = 0; s < scorchCount; s++) {
-                  const sz = 0.008 + Math.random() * 0.012
-                  const baseOpacity = 0.5 + Math.random() * 0.3
-                  const color = Math.random() < 0.5 ? 0x331100 : 0x220000
-                  const geo = new THREE.SphereGeometry(sz, 4, 4)
-                  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: baseOpacity })
-                  const mesh = new THREE.Mesh(geo, mat)
-                  const u = (Math.random() - 0.5) * 0.08
-                  const v = (Math.random() - 0.5) * 0.08
-                  const pos = impactNorm.clone().multiplyScalar(RADIUS)
-                    .add(tan.clone().multiplyScalar(u))
-                    .add(btan.clone().multiplyScalar(v))
-                    .normalize().multiplyScalar(RADIUS)
-                  mesh.position.copy(pos)
-                  scene.add(mesh)
-                  scorchObjs.push({ mesh, geo, mat, baseOpacity })
-                }
-                const scorchT0 = performance.now()
-                const animScorch = () => {
-                  const sp = Math.min((performance.now() - scorchT0) / 8000, 1)
-                  for (const s of scorchObjs) s.mat.opacity = s.baseOpacity * (1 - sp)
-                  if (sp < 1) requestAnimationFrame(animScorch)
-                  else { for (const s of scorchObjs) { scene.remove(s.mesh); s.geo.dispose(); s.mat.dispose() } }
-                }
-                requestAnimationFrame(animScorch)
-
-                // 5. Fade history trail over 2s then remove
-                const trailT0 = performance.now()
-                const animTrail = () => {
-                  const tp = Math.min((performance.now() - trailT0) / 2000, 1)
-                  histMat.opacity = 0.9 * (1 - tp)
-                  if (tp < 1) requestAnimationFrame(animTrail)
-                  else { scene.remove(histLine); histGeo.dispose(); histMat.dispose() }
-                }
-                requestAnimationFrame(animTrail)
-
-                // 6. Camera shake 0.3s, intensity 0.08
-                const camRef = cameraRef.current
-                if (camRef) {
-                  const origPos = camRef.position.clone()
-                  const shakeEnd = Date.now() + 300
-                  const shake = () => {
-                    if (Date.now() > shakeEnd) { camRef.position.copy(origPos); return }
-                    camRef.position.x = origPos.x + (Math.random() - 0.5) * 0.08
-                    camRef.position.y = origPos.y + (Math.random() - 0.5) * 0.08
-                    requestAnimationFrame(shake)
-                  }
-                  shake()
-                }
-              }
-            }
-
-            // ── Update all particles (flight exhaust + impact debris) ─────
-            for (let p = particles.length - 1; p >= 0; p--) {
-              const particle = particles[p]
-              particle.life++
-              if (particle.gravity) particle.velocity.y -= particle.gravity
-              particle.mesh.position.add(particle.velocity)
-              const lr = particle.life / particle.maxLife
-              const sz = particle.startSize + (particle.endSize - particle.startSize) * lr
-              particle.mesh.scale.setScalar(sz / 0.01)
-              particle.mat.opacity = particle.startOpacity + (particle.endOpacity - particle.startOpacity) * lr
-              if (particle.life >= particle.maxLife) {
-                scene.remove(particle.mesh)
-                particle.mat.dispose()
-                particles.splice(p, 1)
-              }
-            }
-
-            // Keep running until all particles drain after impact
-            if (impacted && particles.length === 0) {
-              pBaseGeo.dispose()
-              return false
-            }
-            return true
-          }
-
-          animsRef.current.push(anim)
+          activeMissilesRef.current.push({
+            pathPoints,
+            flightMs: duration,
+            startTime: Date.now(),
+            instanceId: slot,
+            type,
+            active: true,
+            trailHistory: [],
+            trailLine,
+            trailGeo,
+            trailMat,
+            trailPositions,
+            trailColors,
+            impactPoint,
+          })
         }, i * 200)
       }
     },
