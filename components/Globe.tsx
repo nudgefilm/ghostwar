@@ -119,7 +119,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     sceneRef.current = scene
 
     const camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 100)
-    camera.position.z = 2.8
+    camera.position.z = 3.2
     cameraRef.current = camera
 
     // Lighting
@@ -188,6 +188,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     controls.dampingFactor = 0.05
     controls.minDistance = 1.5
     controls.maxDistance = 5
+    controls.target.set(0, 0.1, 0)
     controlsRef.current = controls
 
     // GeoJSON continent lines — per-ring materials for dynamic front/back opacity
