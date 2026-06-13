@@ -7,6 +7,7 @@ import EntryModal, { type Player } from '@/components/EntryModal'
 import { useRealtimeMissiles, type NewsFeedRow, type CountryRow } from '@/hooks/useRealtimeMissiles'
 import { createClient } from '@/lib/supabase/client'
 import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/countries'
+import { SoundEngine } from '@/lib/sounds'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Globe = dynamic(() => import('@/components/Globe'), { ssr: false }) as any
@@ -120,6 +121,8 @@ export default function Home() {
     (missile: import('@/hooks/useRealtimeMissiles').MissileRow) => {
       // Incoming attack on our country
       if (missile.target_country === player?.country_code) {
+        SoundEngine.init()
+        SoundEngine.playAlert()
         setInterceptAlert(`⚠ INCOMING: ${missile.launcher_country} → ${missile.target_country}`)
         setTimeout(() => setInterceptAlert(null), 4000)
       }
@@ -166,9 +169,12 @@ export default function Home() {
     const ammo = weaponType === 'nuke' ? nukes : missiles
     if (ammo - quantity < 0) return
 
-    // Synchronously lock via ref to block any concurrent tap before state re-render
+    SoundEngine.init()
     launchingRef.current = true
     setIsLaunching(true)
+
+    if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
+    else SoundEngine.playLaunch()
 
     try {
       const res = await fetch('/api/launch', {
@@ -224,13 +230,8 @@ export default function Home() {
     (weaponType === 'missile' ? missiles : nukes) < quantity
 
   // ─────────────────────────────────────────────────────────────────────────
-  const panelStyle: React.CSSProperties = {
-    background: 'rgba(11,11,12,0.75)',
-    backdropFilter: 'blur(8px)',
-  }
-
   return (
-    <div className="relative h-screen overflow-hidden font-mono">
+    <div className="font-mono bg-[#0B0B0C]">
 
       {/* ── Entry Modal ── */}
       {!player && <EntryModal onEnter={handleEnter} />}
@@ -243,14 +244,17 @@ export default function Home() {
       )}
 
       {/* ══════════ Globe — full screen background ══════════ */}
-      <div className="fixed inset-0 z-0">
-        <Globe ref={globeRef} />
+      <div
+        className="fixed inset-0 z-0"
+        style={{ width: '100vw', height: '100vh' }}
+      >
+        <Globe ref={globeRef} onImpact={() => { SoundEngine.init(); SoundEngine.playImpact() }} />
       </div>
 
-      {/* ══════════ Top bar (floating) ══════════ */}
+      {/* ══════════ Top bar ══════════ */}
       <header
         className="fixed top-0 left-0 right-0 z-20 h-10 flex items-center px-3 gap-4"
-        style={{ ...panelStyle, borderBottom: '1px solid rgba(255,34,51,0.15)' }}
+        style={{ background: 'rgba(11,11,12,0.82)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(255,34,51,0.2)' }}
       >
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
@@ -276,10 +280,10 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ══════════ LEFT PANEL (floating) ══════════ */}
+      {/* ══════════ LEFT PANEL ══════════ */}
       <aside
-        className="fixed left-0 top-0 h-screen z-10 w-[280px] flex flex-col overflow-y-auto pt-10"
-        style={{ ...panelStyle, borderRight: '1px solid rgba(255,34,51,0.15)' }}
+        className="fixed left-0 top-0 h-screen w-72 z-10 overflow-y-auto pt-10 flex flex-col"
+        style={{ background: 'rgba(11,11,12,0.82)', backdropFilter: 'blur(8px)', borderRight: '1px solid rgba(255,34,51,0.2)' }}
       >
 
         {/* § 1 — OPERATOR */}
@@ -443,10 +447,10 @@ export default function Home() {
         </div>
       </aside>
 
-      {/* ══════════ RIGHT PANEL (floating) ══════════ */}
+      {/* ══════════ RIGHT PANEL ══════════ */}
       <aside
-        className="fixed right-0 top-0 h-screen z-10 w-[300px] flex flex-col overflow-y-auto pt-10"
-        style={{ ...panelStyle, borderLeft: '1px solid rgba(255,34,51,0.15)' }}
+        className="fixed right-0 top-0 h-screen w-72 z-10 overflow-y-auto pt-10 flex flex-col"
+        style={{ background: 'rgba(11,11,12,0.82)', backdropFilter: 'blur(8px)', borderLeft: '1px solid rgba(255,34,51,0.2)' }}
       >
 
         {/* Breaking news */}
