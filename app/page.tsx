@@ -179,36 +179,38 @@ export default function Home() {
       globeRef.current?.flyTo(fromCoords[0], fromCoords[1], 1200)
     }
 
-    // Wait for flyTo animation to finish before firing
-    await new Promise<void>(resolve => setTimeout(resolve, 1500))
+    // Start API call immediately — concurrent with flyTo animation
+    const apiPromise = fetch('/api/launch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        launcher_id: player.id,
+        launcher_country: player.country_code,
+        target_country: targetCountry,
+        type: weaponType,
+        quantity,
+      }),
+    }).then(r => r.json() as Promise<{
+      success?: boolean
+      missile_id?: string
+      arrives_at?: string
+      flight_seconds?: number
+      error?: string
+    }>).catch(() => null)
 
-    if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
-    else SoundEngine.playLaunch()
+    // Wait for flyTo to settle
+    await new Promise<void>(resolve => setTimeout(resolve, 800))
 
     try {
-      const res = await fetch('/api/launch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          launcher_id: player.id,
-          launcher_country: player.country_code,
-          target_country: targetCountry,
-          type: weaponType,
-          quantity,
-        }),
-      })
+      const data = await apiPromise
 
-      const data = (await res.json()) as {
-        success?: boolean
-        missile_id?: string
-        arrives_at?: string
-        flight_seconds?: number
-        error?: string
-      }
-
-      if (data.success && data.flight_seconds) {
+      if (data?.success && data.flight_seconds) {
         const toCoords = COUNTRY_COORDS[targetCountry]
         if (fromCoords && toCoords) {
+          // Sound + missile appear in the same frame
+          if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
+          else SoundEngine.playLaunch()
+          SoundEngine.playFlight(data.flight_seconds * 1000)
           globeRef.current?.launchMissile(
             fromCoords[0], fromCoords[1],
             toCoords[0], toCoords[1],
