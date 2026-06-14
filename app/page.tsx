@@ -336,7 +336,7 @@ export default function Home() {
                 ? `$${(ecoRaw / 1000).toFixed(1)}B`
                 : `$${ecoRaw}M`
 
-              setBattleReport({
+              const reportPayload: BattleReportData = {
                 role: isAttacker ? 'attacker' : 'victim',
                 targetCountry: data.targetCountry!,
                 launcherCountry: result.launcher_country || data.launcherCountry || '',
@@ -348,7 +348,11 @@ export default function Home() {
                 economicDamage,
                 oldRank: result.old_rank,
                 newRank: result.new_rank,
-              })
+              }
+              // Nuke: wait for mushroom cloud to finish before showing modal
+              const modalDelay = type === 'nuke' ? 5500 : 0
+              if (modalDelay > 0) setTimeout(() => setBattleReport(reportPayload), modalDelay)
+              else setBattleReport(reportPayload)
             })
             .catch(() => {})
         }} />
