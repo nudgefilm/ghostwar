@@ -63,28 +63,25 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // Sum all hit missiles for target country and recalculate damage
-  const { data: hitMissiles } = await supabase
-    .from('missiles')
-    .select('quantity, type')
-    .eq('target_country', target_country as string)
-    .eq('status', 'hit')
+  // Atomic damage increment — avoids read-then-write race when multiple missiles
+  // land on the same country simultaneously.
+  const weight = (missile.type as string) === 'nuke' ? 50 : 1
+  const delta  = (missile.quantity as number) * weight
 
-  const totalDamage = hitMissiles?.reduce((sum, m) => {
-    const weight = m.type === 'nuke' ? 50 : 1
-    return sum + (m.quantity as number) * weight
-  }, 0) ?? 0
-
-  const new_damage_percent = Math.min(100, Math.floor(totalDamage / 10))
-
-  const { error: countryUpdateError } = await supabase
-    .from('countries')
-    .update({ damage_percent: new_damage_percent })
-    .eq('code', target_country as string)
+  const { data: dmgRows, error: countryUpdateError } = await supabase
+    .rpc('increment_country_damage', {
+      p_code:  target_country as string,
+      p_delta: delta,
+    })
 
   if (countryUpdateError) {
-    console.error('[impact] countries update failed:', countryUpdateError)
+    console.error('[impact] damage increment failed:', countryUpdateError)
   }
+
+  const dmgRow = Array.isArray(dmgRows) && dmgRows.length > 0
+    ? (dmgRows[0] as { new_stack: number; new_percent: number })
+    : null
+  const new_damage_percent: number = dmgRow ? Number(dmgRow.new_percent) : prev_damage_percent
 
   // Update total_kills and calculate rank (gracefully skip if column missing)
   let old_rank: number | null = null
