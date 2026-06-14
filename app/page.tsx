@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GlobeHandle, ImpactData } from '@/components/Globe'
 import EntryModal, { type Player } from '@/components/EntryModal'
 import TwemojiFlag from '@/components/TwemojiFlag'
+import BattleReportModal, { type BattleReportData } from '@/components/BattleReportModal'
 import { useRealtimeMissiles, type NewsFeedRow, type CountryRow } from '@/hooks/useRealtimeMissiles'
 import { createClient } from '@/lib/supabase/client'
 import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/countries'
@@ -70,6 +71,7 @@ const CARD: React.CSSProperties = {
 export default function Home() {
   const globeRef = useRef<GlobeHandle>(null)
   const launchingRef = useRef(false)
+  const processedMissileIdsRef = useRef<Set<string>>(new Set())
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [targetCountry, setTargetCountry] = useState<string | null>(null)
@@ -86,6 +88,7 @@ export default function Home() {
   const [strikeCount, setStrikeCount] = useState(0)
   const [nukeCount, setNukeCount] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
+  const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -159,6 +162,7 @@ export default function Home() {
             remainingMs,
             missile.id,
             missile.target_country,
+            missile.launcher_country,
           )
           setActiveCount(prev => prev + missile.quantity)
         }
@@ -230,6 +234,7 @@ export default function Home() {
             data.flight_seconds * 1000,
             data.missile_id,
             targetCountry ?? undefined,
+            player.country_code,
           )
           setActiveCount(prev => prev + quantity)
         }
@@ -289,15 +294,69 @@ export default function Home() {
           SoundEngine.init()
           SoundEngine.playImpact()
           setActiveCount(prev => Math.max(0, prev - 1))
-          if (data.missileId && data.targetCountry) {
-            fetch('/api/impact', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ missile_id: data.missileId, target_country: data.targetCountry }),
-            }).catch(() => {})
-          }
+
+          if (!data.missileId || !data.targetCountry) return
+          // Deduplicate: only process once per missile_id across quantity > 1 animations
+          if (processedMissileIdsRef.current.has(data.missileId)) return
+          processedMissileIdsRef.current.add(data.missileId)
+
+          fetch('/api/impact', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ missile_id: data.missileId, target_country: data.targetCountry }),
+          })
+            .then(r => r.json())
+            .then((result: {
+              success: boolean; already_processed: boolean
+              launcher_id: string; launcher_country: string
+              quantity: number; type: string
+              prev_damage_percent: number; new_damage_percent: number
+              old_rank: number | null; new_rank: number | null
+            }) => {
+              if (!result.success) return
+              const isAttacker = player && result.launcher_id === player.id
+              const isVictim = data.targetCountry === player?.country_code && result.launcher_id !== player?.id
+              if (!isAttacker && !isVictim) return
+
+              const qty = result.quantity ?? 1
+              const type = result.type as 'missile' | 'nuke'
+              const infraDelta = !result.already_processed
+                ? result.new_damage_percent - result.prev_damage_percent
+                : null
+              const ecoRaw = qty * (type === 'nuke' ? 500 : 50)
+              const economicDamage = ecoRaw >= 1000
+                ? `$${(ecoRaw / 1000).toFixed(1)}B`
+                : `$${ecoRaw}M`
+
+              setBattleReport({
+                role: isAttacker ? 'attacker' : 'victim',
+                targetCountry: data.targetCountry!,
+                launcherCountry: result.launcher_country || data.launcherCountry || '',
+                quantity: qty,
+                type,
+                successRate: 100,
+                intercepted: 0,
+                infrastructureDamage: infraDelta,
+                economicDamage,
+                oldRank: result.old_rank,
+                newRank: result.new_rank,
+              })
+            })
+            .catch(() => {})
         }} />
       </div>
+
+      {/* Battle Report Modal */}
+      {battleReport && (
+        <BattleReportModal
+          report={battleReport}
+          onClose={() => setBattleReport(null)}
+          onRetaliate={(country) => {
+            setTargetCountry(country)
+            setBattleReport(null)
+          }}
+        />
+      )}
 
       {/* Top bar */}
       <header

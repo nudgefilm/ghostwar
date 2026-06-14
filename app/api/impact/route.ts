@@ -10,14 +10,32 @@ export async function POST(req: NextRequest) {
   }
 
   const { missile_id, target_country } = body
-
   if (!missile_id || !target_country) {
     return NextResponse.json({ error: 'MISSING_FIELDS' }, { status: 400 })
   }
 
   const supabase = createAdminClient()
 
-  // Idempotency: only process if still 'flying'
+  // Always fetch missile metadata so we can return it to all callers
+  const { data: missile, error: missileError } = await supabase
+    .from('missiles')
+    .select('launcher_id, launcher_country, quantity, type')
+    .eq('id', missile_id as string)
+    .single()
+
+  if (missileError || !missile) {
+    return NextResponse.json({ error: 'MISSILE_NOT_FOUND' }, { status: 404 })
+  }
+
+  // Capture prev damage BEFORE any update (accurate only for the first caller)
+  const { data: prevCountry } = await supabase
+    .from('countries')
+    .select('damage_percent')
+    .eq('code', target_country as string)
+    .single()
+  const prev_damage_percent: number = prevCountry?.damage_percent ?? 0
+
+  // Idempotency: mark as hit only if still flying
   const { data: updated, error: updateError } = await supabase
     .from('missiles')
     .update({ status: 'hit' })
@@ -29,12 +47,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'DB_ERROR' }, { status: 500 })
   }
 
-  // Another client already processed this impact
+  // Already processed by another client — return metadata for victim battle report
   if (!updated || updated.length === 0) {
-    return NextResponse.json({ success: true, already_processed: true })
+    return NextResponse.json({
+      success: true,
+      already_processed: true,
+      launcher_id: missile.launcher_id,
+      launcher_country: missile.launcher_country,
+      quantity: missile.quantity,
+      type: missile.type,
+      prev_damage_percent,
+      new_damage_percent: prev_damage_percent,
+      old_rank: null,
+      new_rank: null,
+    })
   }
 
-  // Sum all hit missiles for this country to compute damage
+  // Sum all hit missiles for target country and recalculate damage
   const { data: hitMissiles } = await supabase
     .from('missiles')
     .select('quantity, type')
@@ -53,5 +82,42 @@ export async function POST(req: NextRequest) {
     .update({ damage_percent: new_damage_percent })
     .eq('code', target_country as string)
 
-  return NextResponse.json({ success: true, new_damage_percent })
+  // Update total_kills and calculate rank (gracefully skip if column missing)
+  let old_rank: number | null = null
+  let new_rank: number | null = null
+
+  if (missile.launcher_id) {
+    const { data: launcher, error: launcherError } = await supabase
+      .from('players')
+      .select('total_kills')
+      .eq('id', missile.launcher_id)
+      .single()
+
+    if (!launcherError && launcher != null) {
+      const oldKills = (launcher as Record<string, unknown>).total_kills as number ?? 0
+      const newKills = oldKills + (missile.quantity as number)
+
+      const [{ count: aboveBefore }, , { count: aboveAfter }] = await Promise.all([
+        supabase.from('players').select('*', { count: 'exact', head: true }).gt('total_kills', oldKills),
+        supabase.from('players').update({ total_kills: newKills }).eq('id', missile.launcher_id),
+        supabase.from('players').select('*', { count: 'exact', head: true }).gt('total_kills', newKills),
+      ])
+
+      old_rank = (aboveBefore ?? 0) + 1
+      new_rank = (aboveAfter ?? 0) + 1
+    }
+  }
+
+  return NextResponse.json({
+    success: true,
+    already_processed: false,
+    launcher_id: missile.launcher_id,
+    launcher_country: missile.launcher_country,
+    quantity: missile.quantity,
+    type: missile.type,
+    prev_damage_percent,
+    new_damage_percent,
+    old_rank,
+    new_rank,
+  })
 }

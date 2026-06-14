@@ -57,6 +57,7 @@ interface MissileState {
   impactPoint: THREE.Vector3
   missileId?: string
   targetCountry?: string
+  launcherCountry?: string
 }
 
 export interface GlobeHandle {
@@ -71,6 +72,7 @@ export interface GlobeHandle {
     duration?: number,
     missileId?: string,
     targetCountry?: string,
+    launcherCountry?: string,
   ) => void
 }
 
@@ -88,6 +90,7 @@ interface GeoFeature {
 export interface ImpactData {
   missileId?: string
   targetCountry?: string
+  launcherCountry?: string
   type: 'missile' | 'nuke'
 }
 
@@ -262,7 +265,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
     const triggerExplosion = (m: MissileState) => {
       const ip = m.impactPoint
-      onImpactRef.current?.({ missileId: m.missileId, targetCountry: m.targetCountry, type: m.type })
+      onImpactRef.current?.({ missileId: m.missileId, targetCountry: m.targetCountry, launcherCountry: m.launcherCountry, type: m.type })
 
       // Shared radial-gradient sprite texture — reused by all soft-particle effects this explosion
       const smokeCanvas = document.createElement('canvas')
@@ -712,7 +715,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       requestAnimationFrame(tick)
     },
 
-    launchMissile(fromLat, fromLng, toLat, toLng, quantity, type, duration = 5000, missileId?: string, targetCountry?: string) {
+    launchMissile(fromLat, fromLng, toLat, toLng, quantity, type, duration = 5000, missileId?: string, targetCountry?: string, launcherCountry?: string) {
       const scene = sceneRef.current
       if (!scene) return
 
@@ -767,6 +770,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             impactPoint,
             missileId,
             targetCountry,
+            launcherCountry,
           })
         }, i * 200)
       }
