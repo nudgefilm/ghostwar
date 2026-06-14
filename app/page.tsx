@@ -83,6 +83,9 @@ export default function Home() {
   const [isLaunching, setIsLaunching] = useState(false)
   const [interceptAlert, setInterceptAlert] = useState<string | null>(null)
   const [nukeReward, setNukeReward] = useState<number | null>(null)
+  const [strikeCount, setStrikeCount] = useState(0)
+  const [nukeCount, setNukeCount] = useState(0)
+  const [activeCount, setActiveCount] = useState(0)
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -157,6 +160,7 @@ export default function Home() {
             missile.id,
             missile.target_country,
           )
+          setActiveCount(prev => prev + missile.quantity)
         }
       }
     },
@@ -165,6 +169,8 @@ export default function Home() {
 
   const onNews = useCallback((item: NewsFeedRow) => {
     setNews(prev => [item, ...prev].slice(0, 20))
+    setStrikeCount(prev => prev + 1)
+    if (item.content?.includes('nuclear')) setNukeCount(prev => prev + 1)
   }, [])
 
   const onCountryUpdate = useCallback((country: CountryRow) => {
@@ -225,6 +231,7 @@ export default function Home() {
             data.missile_id,
             targetCountry ?? undefined,
           )
+          setActiveCount(prev => prev + quantity)
         }
         if (weaponType === 'missile') setMissiles(prev => prev - quantity)
         else setNukes(prev => prev - quantity)
@@ -281,6 +288,7 @@ export default function Home() {
         <Globe ref={globeRef} onImpact={(data: ImpactData) => {
           SoundEngine.init()
           SoundEngine.playImpact()
+          setActiveCount(prev => Math.max(0, prev - 1))
           if (data.missileId && data.targetCountry) {
             fetch('/api/impact', {
               method: 'POST',
@@ -301,15 +309,9 @@ export default function Home() {
           <span className="text-zinc-500 text-[10px]">// GLOBAL WARFARE SIM</span>
         </div>
         <div className="flex-1 flex items-center justify-center overflow-hidden">
-          {news[0] ? (
-            <span className="text-zinc-300 text-[10px] tracking-wider truncate">
-              ─ {news[0].content} ─
-            </span>
-          ) : (
-            <span className="text-zinc-500 text-[10px] tracking-wider">
-              ─── AWAITING FIRST STRIKE ───
-            </span>
-          )}
+          <span className="text-zinc-400 text-[10px] tracking-wider truncate">
+            {new Date().toISOString().slice(0, 10)} │ {onlineNations.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
+          </span>
         </div>
         <div className="shrink-0 text-zinc-300 text-[10px] tracking-wider">
           {player ? (
