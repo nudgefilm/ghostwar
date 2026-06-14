@@ -241,12 +241,12 @@ export default function Home() {
     const tick = () => {
       fetch('/api/recover', { method: 'POST' })
         .then(r => r.json())
-        .then((res: { updated?: { code: string; new_stack: number; new_percent: number }[] }) => {
+        .then((res: { updated?: { code: string; damage_stack: number; damage_percent: number }[] }) => {
           res.updated?.forEach(row => {
             setCountries(prev => {
               const existing = prev[row.code]
               if (!existing) return prev
-              return { ...prev, [row.code]: { ...existing, damage_stack: row.new_stack, damage_percent: row.new_percent } }
+              return { ...prev, [row.code]: { ...existing, damage_stack: row.damage_stack, damage_percent: row.damage_percent } }
             })
           })
         })
@@ -436,8 +436,8 @@ export default function Home() {
     : 0
 
   const sortedCountries = Object.values(countries)
-    .filter(c => (c.damage_stack ?? 0) > 0)
-    .sort((a, b) => b.damage_stack - a.damage_stack)
+    .filter(c => (c.damage_percent ?? 0) > 0)
+    .sort((a, b) => (b.damage_stack ?? 0) - (a.damage_stack ?? 0))
     .slice(0, 10)
 
   const onlineCountries = onlineNations
