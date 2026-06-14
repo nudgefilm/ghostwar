@@ -421,19 +421,19 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         }
         requestAnimationFrame(animNukeFlash)
 
-        // Stem: 15 particles rising along surface normal over 1s, staggered 40ms each
-        const stemGeo = new THREE.SphereGeometry(0.01, 4, 4)
+        // Stem: 35 particles rising along surface normal over 2s, staggered 35ms each
+        const stemGeo = new THREE.SphereGeometry(0.01, 5, 5)
         type StemP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; delay: number; angle: number; spread: number; size: number; alive: boolean }
         const stemList: StemP[] = []
         const stemT0 = performance.now()
-        for (let s = 0; s < 15; s++) {
-          const size = 0.015 + Math.random() * 0.01
+        for (let s = 0; s < 35; s++) {
+          const size = 0.018 + Math.random() * 0.014
           const mat = new THREE.MeshBasicMaterial({ color: 0xFFAA00, transparent: true, opacity: 0 })
           const mesh = new THREE.Mesh(stemGeo, mat)
           mesh.position.copy(ip)
           mesh.scale.setScalar(size / 0.01)
           scene.add(mesh)
-          stemList.push({ mesh, mat, delay: s * 40, angle: Math.random() * Math.PI * 2, spread: Math.random() * 0.015, size, alive: true })
+          stemList.push({ mesh, mat, delay: s * 35, angle: Math.random() * Math.PI * 2, spread: Math.random() * 0.04, size, alive: true })
         }
         const animStem = () => {
           const now = performance.now()
@@ -442,26 +442,26 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             if (!p.alive) continue
             const elapsed = now - stemT0 - p.delay
             if (elapsed < 0) { anyAlive = true; continue }
-            if (elapsed >= 3000) {
+            if (elapsed >= 6000) {
               scene.remove(p.mesh); p.mat.dispose(); p.alive = false; continue
             }
             anyAlive = true
-            const riseP = Math.min(elapsed / 1000, 1)
+            const riseP = Math.min(elapsed / 2000, 1)
             p.mesh.position.copy(
               ip.clone()
-                .add(impactNorm.clone().multiplyScalar(riseP * 0.15))
+                .add(impactNorm.clone().multiplyScalar(riseP * 0.28))
                 .add(tan.clone().multiplyScalar(Math.cos(p.angle) * p.spread * riseP))
                 .add(btan.clone().multiplyScalar(Math.sin(p.angle) * p.spread * riseP)),
             )
-            p.mesh.scale.setScalar((p.size + riseP * 0.005) / 0.01)
-            if (elapsed < 300) {
-              p.mat.color.lerpColors(new THREE.Color(0xFFAA00), new THREE.Color(0xFF6600), elapsed / 300)
-              p.mat.opacity = elapsed / 300
-            } else if (elapsed < 1500) {
-              p.mat.color.lerpColors(new THREE.Color(0xFF6600), new THREE.Color(0x888888), (elapsed - 300) / 1200)
+            p.mesh.scale.setScalar((p.size + riseP * 0.008) / 0.01)
+            if (elapsed < 500) {
+              p.mat.color.lerpColors(new THREE.Color(0xFFAA00), new THREE.Color(0xFF6600), elapsed / 500)
+              p.mat.opacity = elapsed / 500
+            } else if (elapsed < 3500) {
+              p.mat.color.lerpColors(new THREE.Color(0xFF6600), new THREE.Color(0x888888), (elapsed - 500) / 3000)
               p.mat.opacity = 1
             } else {
-              const fp = (elapsed - 1500) / 1500
+              const fp = (elapsed - 3500) / 2500
               p.mat.color.lerpColors(new THREE.Color(0x888888), new THREE.Color(0x444444), fp)
               p.mat.opacity = 1 - fp
             }
@@ -471,49 +471,55 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         }
         requestAnimationFrame(animStem)
 
-        // Cap: 12 particles in a ring at stem top, spawned after 800ms
+        // Cap: 2 rings × 16 particles, spawned after 1600ms
+        // Outer ring spreads to r=0.12 at stemTop; inner ring to r=0.07 slightly higher — gives toroidal shape
         setTimeout(() => {
-          const capGeo = new THREE.SphereGeometry(0.01, 4, 4)
-          type CapP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; angle: number }
+          const capGeo = new THREE.SphereGeometry(0.01, 5, 5)
+          type CapP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; angle: number; maxRadius: number; heightOff: number }
           const capList: CapP[] = []
           const capT0 = performance.now()
-          const stemTop = ip.clone().add(impactNorm.clone().multiplyScalar(0.15))
-          for (let c = 0; c < 12; c++) {
-            const size = 0.03 + Math.random() * 0.02
-            const mat = new THREE.MeshBasicMaterial({ color: 0xCCCCCC, transparent: true, opacity: 0 })
+          const stemTop = ip.clone().add(impactNorm.clone().multiplyScalar(0.28))
+          for (let c = 0; c < 32; c++) {
+            const isInner = c >= 16
+            const angle = ((c % 16) / 16) * Math.PI * 2
+            const maxRadius = isInner ? 0.07 : 0.12
+            const heightOff = isInner ? 0.04 : 0
+            const size = isInner ? (0.035 + Math.random() * 0.025) : (0.04 + Math.random() * 0.03)
+            const mat = new THREE.MeshBasicMaterial({ color: 0xDDDDDD, transparent: true, opacity: 0 })
             const mesh = new THREE.Mesh(capGeo, mat)
-            mesh.position.copy(stemTop)
+            mesh.position.copy(stemTop.clone().add(impactNorm.clone().multiplyScalar(heightOff)))
             mesh.scale.setScalar(size / 0.01)
             scene.add(mesh)
-            capList.push({ mesh, mat, angle: (c / 12) * Math.PI * 2 })
+            capList.push({ mesh, mat, angle, maxRadius, heightOff })
           }
           const animCap = () => {
             const elapsed = performance.now() - capT0
-            if (elapsed >= 2000) {
+            if (elapsed >= 4000) {
               for (const p of capList) { scene.remove(p.mesh); p.mat.dispose() }
               capGeo.dispose()
               return
             }
             for (const p of capList) {
-              const radius = Math.min(elapsed / 800, 1) * 0.08
+              const base = stemTop.clone().add(impactNorm.clone().multiplyScalar(p.heightOff))
+              const radius = Math.min(elapsed / 1200, 1) * p.maxRadius
               p.mesh.position.copy(
-                stemTop.clone()
+                base
                   .add(tan.clone().multiplyScalar(Math.cos(p.angle) * radius))
                   .add(btan.clone().multiplyScalar(Math.sin(p.angle) * radius)),
               )
-              if (elapsed < 800) {
-                p.mat.color.lerpColors(new THREE.Color(0xCCCCCC), new THREE.Color(0x888888), elapsed / 800)
-                p.mat.opacity = Math.min(elapsed / 200, 1)
+              if (elapsed < 1800) {
+                p.mat.color.lerpColors(new THREE.Color(0xDDDDDD), new THREE.Color(0x888888), elapsed / 1800)
+                p.mat.opacity = Math.min(elapsed / 300, 1)
               } else {
-                const fp = (elapsed - 800) / 1200
-                p.mat.color.set(0x888888)
+                const fp = (elapsed - 1800) / 2200
+                p.mat.color.set(0x666666)
                 p.mat.opacity = 1 - fp
               }
             }
             requestAnimationFrame(animCap)
           }
           requestAnimationFrame(animCap)
-        }, 800)
+        }, 1600)
       }
     }
 
