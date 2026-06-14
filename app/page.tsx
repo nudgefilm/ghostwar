@@ -156,6 +156,7 @@ export default function Home() {
   const [showRules, setShowRules] = useState(false)
   const [infoModal, setInfoModal] = useState<'operator' | 'privacy' | 'terms' | null>(null)
   const [hofEntries, setHofEntries] = useState<{ nickname: string; country_code: string; action: string }[]>([])
+  const [topTarget, setTopTarget] = useState<{ code: string; hits: number } | null>(null)
   const [alliances, setAlliances] = useState<{ country_a: string; country_b: string; request_count: number; status: string }[]>([])
   const [showAllianceDropdown, setShowAllianceDropdown] = useState(false)
   const [allianceTarget, setAllianceTarget] = useState('')
@@ -379,6 +380,32 @@ export default function Home() {
     const id = setInterval(fetchAlliances, 30_000)
     return () => clearInterval(id)
   }, [fetchAlliances])
+
+  // ── Most-attacked nation today: poll every 30s ────────────────────────────
+  useEffect(() => {
+    const fetchTopTarget = () => {
+      const todayStart = new Date()
+      todayStart.setUTCHours(0, 0, 0, 0)
+      createClient()
+        .from('missiles')
+        .select('target_country')
+        .neq('status', 'flying')
+        .gte('created_at', todayStart.toISOString())
+        .then(({ data }) => {
+          if (!data || data.length === 0) { setTopTarget(null); return }
+          const counts: Record<string, number> = {}
+          for (const row of data) {
+            const c = (row as Record<string, unknown>).target_country as string
+            counts[c] = (counts[c] ?? 0) + 1
+          }
+          const [code, hits] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]
+          setTopTarget({ code, hits })
+        })
+    }
+    fetchTopTarget()
+    const id = setInterval(fetchTopTarget, 30_000)
+    return () => clearInterval(id)
+  }, [])
 
   // ── Defense countdown + interception resolution ────────────────────────────
   useEffect(() => {
@@ -605,6 +632,21 @@ export default function Home() {
   const primaryTimeRemaining = primaryThreat
     ? Math.max(0, Math.round((new Date(primaryThreat.arrives_at).getTime() - Date.now()) / 1000))
     : 0
+
+  // DEFCON level derived from active missile count (no extra query)
+  const defconLevel = activeCount === 0 ? 5 : activeCount <= 3 ? 4 : activeCount <= 7 ? 3 : activeCount <= 15 ? 2 : 1
+  const defconColor = ({ 5: '#00FFAA', 4: '#FFCC00', 3: '#FF8800', 2: '#FF4400', 1: '#FF2233' } as Record<number, string>)[defconLevel]
+  const defconFilled = 6 - defconLevel  // DEFCON 1 → 5 bars lit, DEFCON 5 → 1 bar lit
+
+  // Daily reset countdown — recomputes every 500ms via existing tick
+  const _nowUtc = new Date()
+  const _tomorrowUtc = new Date(Date.UTC(_nowUtc.getUTCFullYear(), _nowUtc.getUTCMonth(), _nowUtc.getUTCDate() + 1))
+  const _msLeft = _tomorrowUtc.getTime() - _nowUtc.getTime()
+  const resetCountdown = [
+    Math.floor(_msLeft / 3600000),
+    Math.floor((_msLeft % 3600000) / 60000),
+    Math.floor((_msLeft % 60000) / 1000),
+  ].map(n => String(n).padStart(2, '0')).join(':')
 
   const onlineCountries = onlineNations
     .map(code => ({ code, flag: COUNTRY_FLAGS[code], name: COUNTRY_NAMES[code] }))
@@ -1299,6 +1341,41 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* GLOBAL THREAT STATUS */}
+        <div className="pointer-events-auto p-3" style={CARD}>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">GLOBAL THREAT STATUS</div>
+          <div className="space-y-1.5">
+            {/* DEFCON gauge */}
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-[10px] font-bold font-mono w-16 shrink-0${defconLevel === 1 ? ' animate-pulse' : ''}`}
+                style={{ color: defconColor }}
+              >
+                DEFCON {defconLevel}
+              </span>
+              <div className="flex gap-0.5">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <div
+                    key={i}
+                    className="w-4 h-2 rounded-sm transition-colors duration-300"
+                    style={{ background: i < defconFilled ? defconColor : 'rgba(255,255,255,0.07)' }}
+                  />
+                ))}
+              </div>
+            </div>
+            {/* Most attacked nation today */}
+            <div className="text-[10px] font-mono truncate" style={{ color: '#FF6600' }}>
+              {topTarget
+                ? `🔥 ${COUNTRY_FLAGS[topTarget.code] ?? ''} ${COUNTRY_NAMES[topTarget.code] ?? topTarget.code} UNDER FIRE (${topTarget.hits} STRIKES)`
+                : '🕊 NO ACTIVE WARZONES'}
+            </div>
+            {/* Daily reset countdown */}
+            <div className="text-[10px] font-mono text-zinc-400">
+              ⏱ RESET IN {resetCountdown}
+            </div>
+          </div>
         </div>
 
       </aside>
