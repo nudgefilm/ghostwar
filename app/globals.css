@@ -53,6 +53,13 @@ body {
 .flags-scroll {
   animation: scroll-flags 22s linear infinite;
 }
+@keyframes scroll-hof {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.hof-scroll {
+  animation: scroll-hof 18s linear infinite;
+}
 
 @keyframes battle-slam {
   0%   { transform: scale(0.82); opacity: 0; }

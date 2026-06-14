@@ -106,6 +106,8 @@ export default function Home() {
   const [activeCount, setActiveCount] = useState(0)
   const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
   const [showRules, setShowRules] = useState(false)
+  const [hofEntries, setHofEntries] = useState<{ nickname: string; country_code: string; action: string }[]>([])
+  const [hofPhase, setHofPhase] = useState<'status' | 'hof'>('status')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { queue: tickerQueue, pushEvent, shift: shiftTicker } = useEventTicker()
@@ -288,6 +290,31 @@ export default function Home() {
     const id = setInterval(tick, 60_000)
     return () => clearInterval(id)
   }, [])
+
+  // ── Hall of Fame: poll every 30s ──────────────────────────────────────────
+  useEffect(() => {
+    const fetchHof = () => {
+      createClient()
+        .from('hall_of_fame')
+        .select('nickname, country_code, action')
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(10)
+        .then(({ data }) => {
+          if (data) setHofEntries(data as { nickname: string; country_code: string; action: string }[])
+        })
+    }
+    fetchHof()
+    const id = setInterval(fetchHof, 30_000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Hall of Fame: alternate war status ↔ HoF ticker every 5s ─────────────
+  useEffect(() => {
+    if (hofEntries.length === 0) { setHofPhase('status'); return }
+    const id = setInterval(() => setHofPhase(p => p === 'status' ? 'hof' : 'status'), 5000)
+    return () => clearInterval(id)
+  }, [hofEntries.length])
 
   // ── Defense countdown + interception resolution ────────────────────────────
   useEffect(() => {
@@ -628,10 +655,34 @@ export default function Home() {
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
           <span className="text-zinc-500 text-[10px]">// GLOBAL WARFARE SIM</span>
         </div>
-        <div className="flex-1 flex items-center justify-center overflow-hidden">
-          <span className="text-zinc-400 text-[10px] tracking-wider truncate">
+        <div className="flex-1 relative overflow-hidden flex items-center justify-center h-full">
+          {/* War Status Bar */}
+          <span
+            className="absolute text-zinc-400 text-[10px] tracking-wider truncate pointer-events-none transition-opacity duration-500"
+            style={{ opacity: hofPhase === 'status' ? 1 : 0 }}
+          >
             {new Date().toISOString().slice(0, 10)} │ {onlineNations.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
           </span>
+          {/* Hall of Fame Ticker */}
+          {hofEntries.length > 0 && (
+            <div
+              className="absolute w-full overflow-hidden pointer-events-none transition-opacity duration-500"
+              style={{ opacity: hofPhase === 'hof' ? 1 : 0 }}
+            >
+              <div className="hof-scroll flex w-max whitespace-nowrap">
+                {[0, 1].map(k => (
+                  <span key={k} className="text-amber-400 text-[10px] tracking-wider font-mono shrink-0">
+                    {hofEntries.map(e =>
+                      e.action === 'nuke_launched'
+                        ? `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`
+                        : `🛡 ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} INTERCEPTED A NUKE`
+                    ).join('  │  ')}
+                    &nbsp;&nbsp;│&nbsp;&nbsp;
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="shrink-0 text-[10px] tracking-wider">
           {player ? (

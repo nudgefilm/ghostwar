@@ -107,12 +107,13 @@ export async function POST(req: NextRequest) {
   if (missile.launcher_id) {
     const { data: launcher, error: launcherError } = await supabase
       .from('players')
-      .select('total_kills')
+      .select('total_kills, nickname')
       .eq('id', missile.launcher_id)
       .single()
 
     if (!launcherError && launcher != null) {
-      const oldKills = (launcher as Record<string, unknown>).total_kills as number ?? 0
+      const l = launcher as Record<string, unknown>
+      const oldKills = (l.total_kills as number) ?? 0
       const newKills = oldKills + (missile.quantity as number)
 
       const [{ count: aboveBefore }, , { count: aboveAfter }] = await Promise.all([
@@ -123,6 +124,15 @@ export async function POST(req: NextRequest) {
 
       old_rank = (aboveBefore ?? 0) + 1
       new_rank = (aboveAfter ?? 0) + 1
+
+      if ((missile.type as string) === 'nuke') {
+        await supabase.from('hall_of_fame').insert({
+          player_id: missile.launcher_id,
+          nickname: String(l.nickname ?? 'UNKNOWN'),
+          country_code: missile.launcher_country,
+          action: 'nuke_launched',
+        })
+      }
     }
   }
 
