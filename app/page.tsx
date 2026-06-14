@@ -96,6 +96,7 @@ export default function Home() {
   const [nukes, setNukes] = useState(0)
   const [recentStrikes, setRecentStrikes] = useState<NewsFeedRow[]>([])
   const [countries, setCountries] = useState<Record<string, CountryRow>>({})
+  const [damagedCountries, setDamagedCountries] = useState<{ code: string; name: string; flag: string; damage_percent: number }[]>([])
   const [onlineNations, setOnlineNations] = useState<string[]>([])
   const [isLaunching, setIsLaunching] = useState(false)
   const [interceptAlert, setInterceptAlert] = useState<string | null>(null)
@@ -128,6 +129,18 @@ export default function Home() {
   })
   defenseStateRef.current = { player, nukes, defenseReadiness, nukeInterceptArmed, incomingThreats }
 
+  const fetchTop5Damaged = useCallback(() => {
+    createClient()
+      .from('countries')
+      .select('code, name, flag, damage_percent')
+      .gt('damage_percent', 0)
+      .order('damage_percent', { ascending: false })
+      .limit(5)
+      .then(({ data }) => {
+        if (data) setDamagedCountries(data as { code: string; name: string; flag: string; damage_percent: number }[])
+      })
+  }, [])
+
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
     const loadCountries = async () => {
@@ -143,6 +156,7 @@ export default function Home() {
         countryData.forEach(c => { map[c.code] = c as CountryRow })
         setCountries(map)
       }
+      fetchTop5Damaged()
       if (playerData) {
         const codes = [...new Set(playerData.map(p => p.country_code as string))]
         setOnlineNations(codes)
@@ -150,7 +164,7 @@ export default function Home() {
       if (todayStrikes != null) setStrikeCount(todayStrikes)
     }
     loadCountries()
-  }, [])
+  }, [fetchTop5Damaged])
 
   // ── Restore session from localStorage ────────────────────────────────────
   useEffect(() => {
@@ -256,12 +270,13 @@ export default function Home() {
               return { ...prev, [row.code]: { ...existing, damage_stack: row.damage_stack, damage_percent: row.damage_percent } }
             })
           })
+          fetchTop5Damaged()
         })
         .catch(() => {})
     }
     const id = setInterval(tick, 60_000)
     return () => clearInterval(id)
-  }, [])
+  }, [fetchTop5Damaged])
 
   // ── Defense countdown + interception resolution ────────────────────────────
   useEffect(() => {
@@ -447,11 +462,6 @@ export default function Home() {
     ? Math.max(0, Math.round((new Date(primaryThreat.arrives_at).getTime() - Date.now()) / 1000))
     : 0
 
-  const sortedCountries = Object.values(countries)
-    .filter(c => (c.damage_percent ?? 0) > 0)
-    .sort((a, b) => (b.damage_stack ?? 0) - (a.damage_stack ?? 0))
-    .slice(0, 10)
-
   const onlineCountries = onlineNations
     .map(code => ({ code, flag: COUNTRY_FLAGS[code], name: COUNTRY_NAMES[code] }))
     .filter(c => c.flag)
@@ -528,6 +538,7 @@ export default function Home() {
               old_rank: number | null; new_rank: number | null
             }) => {
               if (!result.success) return
+              fetchTop5Damaged()
 
               // Scorched Earth ticker — fires for any country reaching 100% (player involvement not required)
               if (!result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100) {
@@ -922,11 +933,11 @@ export default function Home() {
           style={CARD}
         >
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
-          {sortedCountries.length === 0 ? (
+          {damagedCountries.length === 0 ? (
             <div className="text-zinc-500 text-[10px]">No damage recorded</div>
           ) : (
             <div className="space-y-2">
-              {sortedCountries.map((c, i) => (
+              {damagedCountries.map((c, i) => (
                 <button
                   key={c.code}
                   onClick={() => {
