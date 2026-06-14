@@ -449,7 +449,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             const riseP = Math.min(elapsed / 2000, 1)
             p.mesh.position.copy(
               ip.clone()
-                .add(impactNorm.clone().multiplyScalar(riseP * 0.28))
+                .add(impactNorm.clone().multiplyScalar(riseP * 0.15))
                 .add(tan.clone().multiplyScalar(Math.cos(p.angle) * p.spread * riseP))
                 .add(btan.clone().multiplyScalar(Math.sin(p.angle) * p.spread * riseP)),
             )
@@ -478,7 +478,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
           type CapP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; angle: number; maxRadius: number; heightOff: number }
           const capList: CapP[] = []
           const capT0 = performance.now()
-          const stemTop = ip.clone().add(impactNorm.clone().multiplyScalar(0.28))
+          const stemTop = ip.clone().add(impactNorm.clone().multiplyScalar(0.15))
           for (let c = 0; c < 32; c++) {
             const isInner = c >= 16
             const angle = ((c % 16) / 16) * Math.PI * 2
