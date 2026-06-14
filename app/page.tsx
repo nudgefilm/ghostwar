@@ -96,7 +96,7 @@ export default function Home() {
       const supabase = createClient()
       const todayUTC = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z'
       const [{ data: countryData }, { data: playerData }, { count: todayStrikes }] = await Promise.all([
-        supabase.from('countries').select('code, name, flag, damage_percent, online_users'),
+        supabase.from('countries').select('code, name, flag, damage_stack, damage_percent, online_users'),
         supabase.from('players').select('country_code'),
         supabase.from('missiles').select('*', { count: 'exact', head: true }).gte('launched_at', todayUTC),
       ])
@@ -262,8 +262,8 @@ export default function Home() {
 
   // ── Derived ───────────────────────────────────────────────────────────────
   const sortedCountries = Object.values(countries)
-    .filter(c => c.damage_percent > 0)
-    .sort((a, b) => b.damage_percent - a.damage_percent)
+    .filter(c => (c.damage_stack ?? 0) > 0)
+    .sort((a, b) => b.damage_stack - a.damage_stack)
     .slice(0, 10)
 
   const onlineCountries = onlineNations
@@ -624,7 +624,7 @@ export default function Home() {
                   <span className="text-zinc-200 text-xs w-16 truncate shrink-0">{c.name}</span>
                   <DamageBar pct={c.damage_percent} />
                   <span className="text-zinc-300 text-[10px] w-9 text-right shrink-0">
-                    {Math.round(c.damage_percent)}%
+                    {c.damage_percent > 0 ? `${Math.round(c.damage_percent)}%` : '< 1%'}
                   </span>
                 </button>
               ))}

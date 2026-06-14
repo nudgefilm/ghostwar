@@ -29,6 +29,7 @@ export interface CountryRow {
   code: string
   name: string
   flag: string
+  damage_stack: number
   damage_percent: number
   online_users: number
 }
