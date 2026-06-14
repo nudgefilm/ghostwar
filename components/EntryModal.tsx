@@ -89,13 +89,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
         <div className="bg-zinc-950 border border-zinc-800 p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="text-[10px] text-zinc-600 tracking-[0.4em] mb-3">
+            <div className="text-[10px] text-zinc-400 tracking-[0.4em] mb-3">
               ── SECURE CHANNEL ESTABLISHED ──
             </div>
             <h1 className="text-2xl font-bold tracking-[0.2em] mb-2 neon-glow">
               GLOBAL GHOST WAR
             </h1>
-            <p className="text-zinc-600 text-[10px] tracking-widest">
+            <p className="text-zinc-400 text-[10px] tracking-widest">
               SELECT YOUR NATION. CHOOSE YOUR FATE.
             </p>
           </div>
@@ -103,7 +103,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Callsign input */}
             <div>
-              <label className="text-zinc-500 text-xs tracking-[0.3em] block mb-1.5">
+              <label className="text-zinc-400 text-xs tracking-[0.3em] block mb-1.5">
                 OPERATOR CALLSIGN
               </label>
               <input
@@ -114,16 +114,16 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
                 maxLength={16}
                 placeholder="ENTER CALLSIGN..."
                 autoFocus
-                className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-sm px-3 py-2.5 outline-none transition-colors placeholder:text-zinc-700 tracking-widest"
+                className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-sm px-3 py-2.5 outline-none transition-colors placeholder:text-zinc-400 tracking-widest"
               />
-              <div className="text-zinc-700 text-xs mt-1">
+              <div className="text-zinc-400 text-xs mt-1">
                 {nickname.length}/16 — A-Z, 0-9, _ only
               </div>
             </div>
 
             {/* Nation selector */}
             <div>
-              <label className="text-zinc-500 text-xs tracking-[0.3em] block mb-1.5">
+              <label className="text-zinc-400 text-xs tracking-[0.3em] block mb-1.5">
                 NATION
               </label>
               <select
@@ -161,7 +161,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
             </button>
           </form>
 
-          <div className="text-center mt-6 text-zinc-800 text-[10px] tracking-widest">
+          <div className="text-center mt-6 text-zinc-400 text-[10px] tracking-widest">
             BY ENTERING YOU ACCEPT THE TERMS OF TOTAL WAR
           </div>
         </div>

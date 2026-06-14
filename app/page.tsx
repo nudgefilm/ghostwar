@@ -267,20 +267,20 @@ export default function Home() {
       >
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
-          <span className="text-zinc-500 text-[10px]">// GLOBAL WARFARE SIM</span>
+          <span className="text-zinc-400 text-[10px]">// GLOBAL WARFARE SIM</span>
         </div>
         <div className="flex-1 flex items-center justify-center overflow-hidden">
           {news[0] ? (
-            <span className="text-zinc-400 text-[10px] tracking-wider truncate">
+            <span className="text-zinc-300 text-[10px] tracking-wider truncate">
               ─ {news[0].content} ─
             </span>
           ) : (
-            <span className="text-zinc-600 text-[10px] tracking-wider">
+            <span className="text-zinc-500 text-[10px] tracking-wider">
               ─── AWAITING FIRST STRIKE ───
             </span>
           )}
         </div>
-        <div className="shrink-0 text-zinc-400 text-[10px] tracking-wider">
+        <div className="shrink-0 text-zinc-300 text-[10px] tracking-wider">
           {player ? (
             <span>{COUNTRY_FLAGS[player.country_code]} {player.nickname}</span>
           ) : (
@@ -297,7 +297,7 @@ export default function Home() {
 
         {/* § 1 — OPERATOR */}
         <div className="p-3 border-b border-zinc-800/60">
-          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">OPERATOR</div>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">OPERATOR</div>
           {player ? (
             <>
               <div className="flex items-center gap-2 mb-2">
@@ -308,10 +308,10 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex items-center gap-4 text-[10px]">
-                <span className="text-zinc-500">
+                <span className="text-zinc-400">
                   🚀 <span className="text-green-400 font-bold">{missiles}</span>
                 </span>
-                <span className="text-zinc-500">
+                <span className="text-zinc-400">
                   ☢️ <span className="text-orange-400 font-bold">{nukes}</span>
                 </span>
                 <button
@@ -319,27 +319,27 @@ export default function Home() {
                     localStorage.removeItem('ghostwar_player')
                     setPlayer(null)
                   }}
-                  className="ml-auto text-zinc-700 text-[10px] hover:text-zinc-500 transition-colors cursor-pointer"
+                  className="ml-auto text-zinc-600 text-[10px] hover:text-zinc-400 transition-colors cursor-pointer"
                 >
                   [EXIT]
                 </button>
               </div>
             </>
           ) : (
-            <div className="text-zinc-700 text-[10px]">NOT AUTHENTICATED</div>
+            <div className="text-zinc-600 text-[10px]">NOT AUTHENTICATED</div>
           )}
         </div>
 
         {/* § 2 — WEAPONS */}
         <div className="p-3 border-b border-zinc-800/60">
-          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">WEAPONS</div>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">WEAPONS</div>
           <div className="flex gap-2 mb-3">
             <button
               onClick={() => setWeaponType('missile')}
               className={`flex-1 py-1.5 text-[10px] tracking-widest border transition-colors cursor-pointer ${
                 weaponType === 'missile'
                   ? 'bg-red-950 border-red-800 text-red-300'
-                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-500 hover:border-zinc-600'
+                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:border-zinc-600'
               }`}
             >
               🚀 MISSILE
@@ -350,7 +350,7 @@ export default function Home() {
               className={`flex-1 py-1.5 text-[10px] tracking-widest border transition-colors ${
                 weaponType === 'nuke'
                   ? 'bg-orange-950 border-orange-700 text-orange-300'
-                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-600 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-500 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
               }`}
             >
               ☢️ NUKE
@@ -364,7 +364,7 @@ export default function Home() {
             onChange={e => setQuantity(Number(e.target.value))}
             className="w-full mb-2 accent-red-600"
           />
-          <div className="text-zinc-500 text-[10px] text-center tracking-widest">
+          <div className="text-zinc-400 text-[10px] text-center tracking-widest">
             <span className="text-white font-bold">{quantity}</span>
             {' × '}
             <span className={weaponType === 'nuke' ? 'text-orange-400' : 'text-red-400'}>
@@ -375,7 +375,7 @@ export default function Home() {
 
         {/* § 3 — TARGET */}
         <div className="p-3 border-b border-zinc-800/60">
-          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">TARGET</div>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">TARGET</div>
           <select
             value={targetCountry ?? ''}
             onChange={e => setTargetCountry(e.target.value || null)}
@@ -395,7 +395,7 @@ export default function Home() {
             </div>
           )}
           {targetCountry && player && (
-            <div className="text-zinc-500 text-xs">
+            <div className="text-zinc-400 text-xs">
               ETA{' '}
               <span className="text-zinc-200 text-sm">
                 {Math.round(
@@ -434,10 +434,10 @@ export default function Home() {
 
         {/* § 5 — DEFENSE */}
         <div className="p-3 border-b border-zinc-800/60">
-          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
           <button
             disabled
-            className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-600 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
+            className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-500 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
           >
             🛡️ INTERCEPT
           </button>
@@ -445,14 +445,14 @@ export default function Home() {
             <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
               <div className="h-full bg-zinc-600" style={{ width: '0%' }} />
             </div>
-            <span className="text-zinc-700 text-[10px]">0%</span>
+            <span className="text-zinc-600 text-[10px]">0%</span>
           </div>
         </div>
 
         {/* § 6 — ALLIANCES */}
         <div className="p-3">
-          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">ALLIANCES</div>
-          <div className="text-zinc-700 text-[10px]">No active alliances</div>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">ALLIANCES</div>
+          <div className="text-zinc-600 text-[10px]">No active alliances</div>
         </div>
       </aside>
 
@@ -464,9 +464,9 @@ export default function Home() {
 
         {/* Breaking news */}
         <div className="p-3 border-b border-zinc-800/60 flex-1 min-h-0">
-          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">BREAKING NEWS</div>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">BREAKING NEWS</div>
           {news.length === 0 ? (
-            <div className="text-zinc-600 text-[10px]">Awaiting first strike...</div>
+            <div className="text-zinc-500 text-[10px]">Awaiting first strike...</div>
           ) : (
             <div className="space-y-1.5 overflow-y-auto">
               {news.map((item, i) => (
@@ -491,9 +491,9 @@ export default function Home() {
 
         {/* Damage rankings */}
         <div className="p-3">
-          <div className="text-zinc-600 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
           {sortedCountries.length === 0 ? (
-            <div className="text-zinc-600 text-[10px]">No damage recorded</div>
+            <div className="text-zinc-500 text-[10px]">No damage recorded</div>
           ) : (
             <div className="space-y-2">
               {sortedCountries.map((c, i) => (
@@ -505,11 +505,11 @@ export default function Home() {
                   }}
                   className="w-full flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
                 >
-                  <span className="text-zinc-600 text-xs w-4 shrink-0">#{i + 1}</span>
+                  <span className="text-zinc-500 text-xs w-4 shrink-0">#{i + 1}</span>
                   <span className="text-sm shrink-0">{c.flag}</span>
                   <span className="text-zinc-200 text-xs w-16 truncate shrink-0">{c.name}</span>
                   <DamageBar pct={c.damage_percent} />
-                  <span className="text-zinc-400 text-[10px] w-9 text-right shrink-0">
+                  <span className="text-zinc-300 text-[10px] w-9 text-right shrink-0">
                     {Math.round(c.damage_percent)}%
                   </span>
                 </button>
