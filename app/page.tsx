@@ -663,25 +663,18 @@ export default function Home() {
           >
             {new Date().toISOString().slice(0, 10)} │ {onlineNations.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
           </span>
-          {/* Hall of Fame Ticker — same inset-0 bounds as war status, scroll is centered */}
+          {/* Hall of Fame Ticker — same inset-0 bounds as war status, static centered text */}
           {hofEntries.length > 0 && (
-            <div
-              className="absolute inset-0 overflow-hidden flex items-center justify-center pointer-events-none transition-opacity duration-500"
+            <span
+              className="absolute inset-0 flex items-center justify-center text-amber-400 text-[10px] tracking-wider font-mono truncate pointer-events-none transition-opacity duration-500"
               style={{ opacity: hofPhase === 'hof' ? 1 : 0 }}
             >
-              <div className="hof-scroll flex w-max whitespace-nowrap">
-                {[0, 1].map(k => (
-                  <span key={k} className="text-amber-400 text-[10px] tracking-wider font-mono shrink-0">
-                    {hofEntries.map(e =>
-                      e.action === 'nuke_launched'
-                        ? `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`
-                        : `🛡 ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} INTERCEPTED A NUKE`
-                    ).join('  │  ')}
-                    &nbsp;&nbsp;│&nbsp;&nbsp;
-                  </span>
-                ))}
-              </div>
-            </div>
+              {hofEntries.map(e =>
+                e.action === 'nuke_launched'
+                  ? `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`
+                  : `🛡 ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} INTERCEPTED A NUKE`
+              ).join('  │  ')}
+            </span>
           )}
         </div>
         <div className="shrink-0 text-[10px] tracking-wider">
