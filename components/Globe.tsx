@@ -264,6 +264,19 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const ip = m.impactPoint
       onImpactRef.current?.({ missileId: m.missileId, targetCountry: m.targetCountry, type: m.type })
 
+      // Shared radial-gradient sprite texture — reused by all soft-particle effects this explosion
+      const smokeCanvas = document.createElement('canvas')
+      smokeCanvas.width = 64; smokeCanvas.height = 64
+      const smokeCtx = smokeCanvas.getContext('2d')!
+      const grad = smokeCtx.createRadialGradient(32, 32, 0, 32, 32, 32)
+      grad.addColorStop(0,   'rgba(255,255,255,1)')
+      grad.addColorStop(0.4, 'rgba(255,255,255,0.6)')
+      grad.addColorStop(1,   'rgba(255,255,255,0)')
+      smokeCtx.fillStyle = grad
+      smokeCtx.fillRect(0, 0, 64, 64)
+      const smokeTexture = new THREE.CanvasTexture(smokeCanvas)
+      setTimeout(() => smokeTexture.dispose(), 9000)
+
       // Flash: intensity 5, 0.25s
       const flashLight = new THREE.PointLight(0xFF4400, 5, 1.5)
       flashLight.position.copy(ip)
@@ -317,41 +330,45 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         }, delay)
       })
 
-      // Debris: 35 particles, varied size/speed, 20% white sparks, gravity
-      const debrisBase = new THREE.SphereGeometry(0.01, 4, 4)
-      type DebrisP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; vel: THREE.Vector3; life: number; maxLife: number; startSz: number; gravity: number }
+      // Debris: 35 sprite particles, varied size/speed, 20% white sparks, gravity
+      type DebrisP = { sprite: THREE.Sprite; mat: THREE.SpriteMaterial; vel: THREE.Vector3; life: number; maxLife: number; startSz: number; gravity: number }
       const debrisList: DebrisP[] = []
       for (let d = 0; d < 35; d++) {
         const sz = 0.004 + Math.random() * 0.014
         const isWhite = Math.random() < 0.2
         const color = isWhite ? 0xFFFFFF : debrisColors[Math.floor(Math.random() * debrisColors.length)]
+        const isBright = isWhite || color === 0xFFCC00 || color === 0xFF8800
         const speedMult = 0.5 + Math.random() * 1.5
         const vel = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)
           .normalize().multiplyScalar((0.002 + Math.random() * 0.005) * speedMult)
-        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 })
-        const mesh = new THREE.Mesh(debrisBase, mat)
-        mesh.position.copy(ip)
-        mesh.scale.setScalar(sz / 0.01)
-        scene.add(mesh)
-        debrisList.push({ mesh, mat, vel, life: 0, maxLife: 40, startSz: sz, gravity: 0.001 })
+        const mat = new THREE.SpriteMaterial({
+          map: smokeTexture, color, transparent: true, opacity: 1,
+          depthWrite: false, blending: isBright ? THREE.AdditiveBlending : THREE.NormalBlending,
+        })
+        const sprite = new THREE.Sprite(mat)
+        const s0 = sz * 8
+        sprite.scale.set(s0, s0, 1)
+        sprite.position.copy(ip)
+        scene.add(sprite)
+        debrisList.push({ sprite, mat, vel, life: 0, maxLife: 40, startSz: sz, gravity: 0.001 })
       }
       const animDebris = () => {
         for (let d = debrisList.length - 1; d >= 0; d--) {
           const deb = debrisList[d]
           deb.life++
           deb.vel.y -= deb.gravity
-          deb.mesh.position.add(deb.vel)
+          deb.sprite.position.add(deb.vel)
           const lr = deb.life / deb.maxLife
-          deb.mesh.scale.setScalar((deb.startSz * (1 - lr)) / 0.01)
+          const s = deb.startSz * (1 - lr) * 8
+          deb.sprite.scale.set(s, s, 1)
           deb.mat.opacity = 1 - lr
           if (deb.life >= deb.maxLife) {
-            scene.remove(deb.mesh)
+            scene.remove(deb.sprite)
             deb.mat.dispose()
             debrisList.splice(d, 1)
           }
         }
         if (debrisList.length > 0) requestAnimationFrame(animDebris)
-        else debrisBase.dispose()
       }
       requestAnimationFrame(animDebris)
 
@@ -361,30 +378,34 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const tan = impactNorm.clone().cross(tUp).normalize()
       const btan = impactNorm.clone().cross(tan).normalize()
       const scorchCount = 8 + Math.floor(Math.random() * 5)
-      const scorchObjs: { mesh: THREE.Mesh; geo: THREE.SphereGeometry; mat: THREE.MeshBasicMaterial; baseOpacity: number }[] = []
+      const scorchObjs: { sprite: THREE.Sprite; mat: THREE.SpriteMaterial; baseOpacity: number }[] = []
       for (let s = 0; s < scorchCount; s++) {
         const sz = 0.008 + Math.random() * 0.012
         const baseOpacity = 0.5 + Math.random() * 0.3
         const color = Math.random() < 0.5 ? 0x331100 : 0x220000
-        const geo = new THREE.SphereGeometry(sz, 4, 4)
-        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: baseOpacity })
-        const mesh = new THREE.Mesh(geo, mat)
+        const mat = new THREE.SpriteMaterial({
+          map: smokeTexture, color, transparent: true, opacity: baseOpacity,
+          depthWrite: false, blending: THREE.NormalBlending,
+        })
+        const sprite = new THREE.Sprite(mat)
+        const s0 = sz * 8
+        sprite.scale.set(s0, s0, 1)
         const u = (Math.random() - 0.5) * 0.08
         const v = (Math.random() - 0.5) * 0.08
         const pos = impactNorm.clone().multiplyScalar(RADIUS)
           .add(tan.clone().multiplyScalar(u))
           .add(btan.clone().multiplyScalar(v))
           .normalize().multiplyScalar(RADIUS)
-        mesh.position.copy(pos)
-        scene.add(mesh)
-        scorchObjs.push({ mesh, geo, mat, baseOpacity })
+        sprite.position.copy(pos)
+        scene.add(sprite)
+        scorchObjs.push({ sprite, mat, baseOpacity })
       }
       const scorchT0 = performance.now()
       const animScorch = () => {
         const sp = Math.min((performance.now() - scorchT0) / 8000, 1)
         for (const s of scorchObjs) s.mat.opacity = s.baseOpacity * (1 - sp)
         if (sp < 1) requestAnimationFrame(animScorch)
-        else { for (const s of scorchObjs) { scene.remove(s.mesh); s.geo.dispose(); s.mat.dispose() } }
+        else { for (const s of scorchObjs) { scene.remove(s.sprite); s.mat.dispose() } }
       }
       requestAnimationFrame(animScorch)
 
@@ -417,19 +438,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       // ── Mushroom cloud (nuke only) ──────────────────────────────────────
       if (m.type === 'nuke') {
         // impactNorm / tan / btan are already computed by the scorch mark section above
-
-        // Radial gradient texture — soft circular puff, shared by all particles this explosion
-        const smokeCanvas = document.createElement('canvas')
-        smokeCanvas.width = 64; smokeCanvas.height = 64
-        const smokeCtx = smokeCanvas.getContext('2d')!
-        const grad = smokeCtx.createRadialGradient(32, 32, 0, 32, 32, 32)
-        grad.addColorStop(0,   'rgba(255,255,255,1)')
-        grad.addColorStop(0.4, 'rgba(255,255,255,0.6)')
-        grad.addColorStop(1,   'rgba(255,255,255,0)')
-        smokeCtx.fillStyle = grad
-        smokeCtx.fillRect(0, 0, 64, 64)
-        const smokeTexture = new THREE.CanvasTexture(smokeCanvas)
-        setTimeout(() => smokeTexture.dispose(), 7000)
 
         // Extra bright white flash: intensity 10, 0.15s
         const nukeFlash = new THREE.PointLight(0xFFFFFF, 10, 2)
