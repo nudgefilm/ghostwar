@@ -110,6 +110,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'AMMO_UPDATE_FAILED' }, { status: 500 })
   }
 
+  // Check for active alliance — if one exists, this launch is a betrayal.
+  // Reduction is stored on the missile so impact route applies it even after
+  // the alliance is broken.
+  const [allianceA, allianceB] = [launcher_country as string, target_country as string].sort()
+  const { data: activeAlliance } = await supabase
+    .from('alliances')
+    .select('request_count')
+    .eq('country_a', allianceA)
+    .eq('country_b', allianceB)
+    .eq('status', 'active')
+    .maybeSingle()
+
+  let alliance_reduction = 0
+  let betrayal = false
+  if (activeAlliance) {
+    alliance_reduction = Math.min(50, (activeAlliance as Record<string, unknown>).request_count as number * 5)
+    betrayal = true
+    await Promise.all([
+      supabase
+        .from('alliances')
+        .update({ status: 'broken' })
+        .eq('country_a', allianceA)
+        .eq('country_b', allianceB),
+      supabase.from('news_feed').insert({
+        content: `🔴 BETRAYAL: ${launcher_country} attacked allied nation ${target_country}!`,
+        launcher_country,
+        target_country,
+        type: 'alliance_broken',
+        is_template: false,
+      }),
+    ])
+  }
+
   // Insert missile row
   const { data: missileData, error: missileError } = await supabase
     .from('missiles')
@@ -122,6 +155,7 @@ export async function POST(req: NextRequest) {
       arrives_at,
       status: 'flying',
       attacker_debuffed,
+      alliance_reduction,
     })
     .select('id')
     .single()
@@ -152,5 +186,7 @@ export async function POST(req: NextRequest) {
     flight_seconds,
     nukes_earned: nukesEarned,
     attacker_debuffed,
+    betrayal,
+    alliance_reduction,
   })
 }

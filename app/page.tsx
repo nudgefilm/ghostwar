@@ -108,6 +108,9 @@ export default function Home() {
   const [showRules, setShowRules] = useState(false)
   const [hofEntries, setHofEntries] = useState<{ nickname: string; country_code: string; action: string }[]>([])
   const [hofPhase, setHofPhase] = useState<'status' | 'hof'>('status')
+  const [alliances, setAlliances] = useState<{ country_a: string; country_b: string; request_count: number; status: string }[]>([])
+  const [showAllianceDropdown, setShowAllianceDropdown] = useState(false)
+  const [allianceTarget, setAllianceTarget] = useState('')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { queue: tickerQueue, pushEvent, shift: shiftTicker } = useEventTicker()
@@ -316,6 +319,26 @@ export default function Home() {
     return () => clearInterval(id)
   }, [hofEntries.length])
 
+  // ── Alliance data: fetch on login + poll every 30s ────────────────────────
+  const fetchAlliances = useCallback(() => {
+    if (!player?.country_code) return
+    createClient()
+      .from('alliances')
+      .select('country_a, country_b, request_count, status')
+      .or(`country_a.eq.${player.country_code},country_b.eq.${player.country_code}`)
+      .neq('status', 'broken')
+      .then(({ data }) => {
+        if (data) setAlliances(data as { country_a: string; country_b: string; request_count: number; status: string }[])
+      })
+  }, [player?.country_code])
+
+  useEffect(() => {
+    if (!player?.country_code) return
+    fetchAlliances()
+    const id = setInterval(fetchAlliances, 30_000)
+    return () => clearInterval(id)
+  }, [fetchAlliances])
+
   // ── Defense countdown + interception resolution ────────────────────────────
   useEffect(() => {
     const timer = setInterval(() => {
@@ -407,6 +430,36 @@ export default function Home() {
     setDropdownOpen(false)
   }
 
+  const handleAllianceRequest = useCallback(async (targetCode: string) => {
+    if (!player) return
+    const [a, b] = [player.country_code, targetCode].sort()
+    await fetch('/api/alliance/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ country_a: a, country_b: b }),
+    })
+    fetchAlliances()
+  }, [player, fetchAlliances])
+
+  const handleAllianceAccept = useCallback(async (a: string, b: string) => {
+    await fetch('/api/alliance/accept', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ country_a: a, country_b: b }),
+    })
+    fetchAlliances()
+    SoundEngine.playAlliance()
+  }, [fetchAlliances])
+
+  const handleAllianceBreak = useCallback(async (a: string, b: string) => {
+    await fetch('/api/alliance/break', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ country_a: a, country_b: b }),
+    })
+    fetchAlliances()
+  }, [fetchAlliances])
+
   // Close dropdown on outside click
   useEffect(() => {
     if (!dropdownOpen) return
@@ -449,6 +502,8 @@ export default function Home() {
       flight_seconds?: number
       nukes_earned?: number
       attacker_debuffed?: boolean
+      betrayal?: boolean
+      alliance_reduction?: number
       error?: string
     }>).catch(() => null)
 
@@ -481,6 +536,10 @@ export default function Home() {
           setTimeout(() => setNukeReward(null), 4000)
           pushEvent(`☢ NUKE EARNED — +${data.nukes_earned}`, 'reward')
         }
+        if (data.betrayal) {
+          pushEvent(`🚨 ALLIANCE BROKEN — betrayal strike on ${COUNTRY_NAMES[targetCountry] ?? targetCountry}`, 'alliance')
+          fetchAlliances()
+        }
       }
     } finally {
       launchingRef.current = false
@@ -489,6 +548,12 @@ export default function Home() {
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
+  const myAlliances = player
+    ? alliances.filter(a => a.country_a === player.country_code || a.country_b === player.country_code)
+    : []
+  const pendingIncoming = myAlliances.filter(a => a.status === 'pending')
+  const activeAlliances = myAlliances.filter(a => a.status === 'active')
+
   const primaryThreat = incomingThreats.length > 0
     ? [...incomingThreats].sort(
         (a, b) => new Date(a.arrives_at).getTime() - new Date(b.arrives_at).getTime(),
@@ -572,6 +637,7 @@ export default function Home() {
               launcher_id: string; launcher_country: string
               quantity: number; type: string
               attacker_debuffed: boolean
+              alliance_reduction: number
               prev_damage_percent: number; new_damage_percent: number
               old_rank: number | null; new_rank: number | null
             }) => {
@@ -621,6 +687,7 @@ export default function Home() {
                 newRank: result.new_rank,
                 attacker_debuffed: !!isAttacker && (result.attacker_debuffed ?? false),
                 targetDestroyed: !result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100,
+                alliance_reduction_percent: !!isAttacker && result.alliance_reduction > 0 ? result.alliance_reduction : undefined,
               }
               // Nuke: wait for mushroom cloud to finish before showing modal
               const modalDelay = type === 'nuke' ? 5500 : 0
@@ -930,6 +997,104 @@ export default function Home() {
               </div>
               <span className="text-zinc-600 text-[10px]">0%</span>
             </div>
+          </div>
+        )}
+
+        {/* ALLIANCES — only shown when logged in */}
+        {player && (
+          <div className="pointer-events-auto p-3" style={{ ...CARD, borderColor: 'rgba(0,255,170,0.22)' }}>
+            <div className="text-zinc-500 text-[10px] tracking-widest mb-2">ALLIANCES</div>
+
+            {/* Pending incoming requests */}
+            {pendingIncoming.map(a => {
+              const other = a.country_a === player.country_code ? a.country_b : a.country_a
+              return (
+                <div key={`${a.country_a}-${a.country_b}`} className="mb-2 p-1.5 border border-[#00FFAA]/25 bg-[#00FFAA]/5">
+                  <div className="text-[#00FFAA] text-[10px] mb-1">
+                    🤝 {COUNTRY_FLAGS[other] ?? ''} {COUNTRY_NAMES[other] ?? other} requests alliance
+                  </div>
+                  <button
+                    onClick={() => handleAllianceAccept(a.country_a, a.country_b)}
+                    className="text-[10px] tracking-widest border border-[#00FFAA]/50 hover:border-[#00FFAA] px-2 py-0.5 text-[#00FFAA] hover:bg-[#00FFAA]/10 transition-colors cursor-pointer"
+                  >
+                    [ ACCEPT ]
+                  </button>
+                </div>
+              )
+            })}
+
+            {/* Active alliances with strength bar */}
+            {activeAlliances.length > 0 && (
+              <div className="space-y-1.5 mb-2">
+                {activeAlliances.map(a => {
+                  const other = a.country_a === player.country_code ? a.country_b : a.country_a
+                  const strength = Math.min(50, a.request_count * 5)
+                  const filled = Math.round(strength / 10)
+                  return (
+                    <div key={`${a.country_a}-${a.country_b}`} className="flex items-center gap-1.5">
+                      <TwemojiFlag code={other} size={12} className="shrink-0" />
+                      <span className="text-zinc-200 text-[10px] w-14 truncate shrink-0">{COUNTRY_NAMES[other] ?? other}</span>
+                      <span className="text-[#00FFAA] text-[10px] font-mono">
+                        {'█'.repeat(filled)}{'░'.repeat(5 - filled)}
+                      </span>
+                      <span className="text-[#00FFAA] text-[9px] ml-0.5">{strength}%</span>
+                      <button
+                        onClick={() => handleAllianceBreak(a.country_a, a.country_b)}
+                        className="ml-auto text-zinc-600 text-[9px] hover:text-[#FF2233] transition-colors cursor-pointer shrink-0"
+                      >
+                        [BREAK]
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {activeAlliances.length === 0 && pendingIncoming.length === 0 && (
+              <div className="text-zinc-500 text-[10px] mb-2">No active alliances</div>
+            )}
+
+            {/* Request a new alliance */}
+            {!showAllianceDropdown ? (
+              <button
+                onClick={() => setShowAllianceDropdown(true)}
+                className="w-full py-1.5 text-[10px] tracking-widest border border-[#00FFAA]/25 hover:border-[#00FFAA]/50 text-[#00FFAA] hover:bg-[#00FFAA]/5 transition-colors cursor-pointer"
+              >
+                [ REQUEST ALLIANCE ]
+              </button>
+            ) : (
+              <div>
+                <select
+                  value={allianceTarget}
+                  onChange={e => setAllianceTarget(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1 mb-1"
+                >
+                  <option value="">— SELECT NATION —</option>
+                  {COUNTRIES.filter(c => c.code !== player.country_code).map(c => (
+                    <option key={c.code} value={c.code}>{COUNTRY_FLAGS[c.code] ?? ''} {c.name}</option>
+                  ))}
+                </select>
+                <div className="flex gap-1">
+                  <button
+                    onClick={async () => {
+                      if (!allianceTarget) return
+                      await handleAllianceRequest(allianceTarget)
+                      setAllianceTarget('')
+                      setShowAllianceDropdown(false)
+                    }}
+                    className="flex-1 py-1 text-[10px] tracking-widest border border-[#00FFAA]/50 text-[#00FFAA] hover:bg-[#00FFAA]/10 transition-colors cursor-pointer"
+                  >
+                    SEND
+                  </button>
+                  <button
+                    onClick={() => { setShowAllianceDropdown(false); setAllianceTarget('') }}
+                    className="px-2 py-1 text-[10px] border border-zinc-700 text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

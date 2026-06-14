@@ -16,6 +16,7 @@ export interface BattleReportData {
   newRank: number | null
   attacker_debuffed?: boolean
   targetDestroyed?: boolean
+  alliance_reduction_percent?: number
 }
 
 interface Props {
@@ -107,7 +108,7 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
           </div>
 
           {/* Contextual notes */}
-          {(report.attacker_debuffed || report.targetDestroyed) && (
+          {(report.attacker_debuffed || report.targetDestroyed || (report.alliance_reduction_percent ?? 0) > 0) && (
             <div className="space-y-1 mb-3">
               {report.attacker_debuffed && (
                 <div className="text-[10px]" style={{ color: '#FF6600' }}>
@@ -117,6 +118,11 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
               {report.targetDestroyed && (
                 <div className="text-[10px] font-bold text-[#FF2233]">
                   ☠ {report.targetCountry} has been SCORCHED — their attack power is now reduced 50%
+                </div>
+              )}
+              {(report.alliance_reduction_percent ?? 0) > 0 && (
+                <div className="text-[10px]" style={{ color: '#00FFAA' }}>
+                  🤝 Alliance with {report.targetCountry} reduced damage by {report.alliance_reduction_percent}%
                 </div>
               )}
             </div>

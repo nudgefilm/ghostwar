@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   // Always fetch missile metadata so we can return it to all callers
   const { data: missile, error: missileError } = await supabase
     .from('missiles')
-    .select('launcher_id, launcher_country, quantity, type, attacker_debuffed')
+    .select('launcher_id, launcher_country, quantity, type, attacker_debuffed, alliance_reduction')
     .eq('id', missile_id as string)
     .single()
 
@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
       quantity: missile.quantity,
       type: missile.type,
       attacker_debuffed: (missile as Record<string, unknown>).attacker_debuffed ?? false,
+      alliance_reduction: ((missile as Record<string, unknown>).alliance_reduction as number) ?? 0,
       prev_damage_percent,
       new_damage_percent: prev_damage_percent,
       old_rank: null,
@@ -69,9 +70,13 @@ export async function POST(req: NextRequest) {
   // land on the same country simultaneously.
   const weight = (missile.type as string) === 'nuke' ? 50 : 1
   const debuffed = (missile as Record<string, unknown>).attacker_debuffed === true
-  const delta = debuffed
+  const alliance_reduction = ((missile as Record<string, unknown>).alliance_reduction as number) ?? 0
+  const baseDelta = debuffed
     ? Math.max(1, Math.floor((missile.quantity as number) * weight * 0.5))
     : (missile.quantity as number) * weight
+  const delta = alliance_reduction > 0
+    ? Math.max(1, Math.floor(baseDelta * (1 - alliance_reduction / 100)))
+    : baseDelta
 
   const { data: dmgRows, error: countryUpdateError } = await supabase
     .rpc('increment_country_damage', {
@@ -144,6 +149,7 @@ export async function POST(req: NextRequest) {
     quantity: missile.quantity,
     type: missile.type,
     attacker_debuffed: (missile as Record<string, unknown>).attacker_debuffed ?? false,
+    alliance_reduction,
     prev_damage_percent,
     new_damage_percent,
     old_rank,

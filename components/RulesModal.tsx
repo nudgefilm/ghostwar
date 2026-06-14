@@ -9,6 +9,7 @@ const GAME_RULES: { icon: string; title: string; text: string }[] = [
   { icon: '🔄', title: 'RECOVERY',       text: 'All nations recover 10% damage daily at 00:00 UTC' },
   { icon: '🏆', title: 'RANKINGS',       text: 'Climb the leaderboard by landing successful strikes' },
   { icon: '🛡️', title: 'DEFENSE',        text: 'Click INTERCEPT rapidly when under attack to build up interception chance. Nukes can only be intercepted by nukes.' },
+  { icon: '🤝', title: 'ALLIANCES',      text: 'Allied nations deal reduced damage to each other (5% per alliance point, max 50%). Attacking an ally breaks the alliance.' },
   // FUTURE RULES GO HERE — just add new objects to this array
 ]
 
