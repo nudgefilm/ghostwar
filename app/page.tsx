@@ -606,8 +606,8 @@ export default function Home() {
 
         {/* DAMAGE RANKINGS */}
         <div
-          className="pointer-events-auto p-3 overflow-y-auto"
-          style={{ ...CARD, scrollbarWidth: 'none', maxHeight: '260px' }}
+          className="pointer-events-auto p-3"
+          style={CARD}
         >
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
           {sortedCountries.length === 0 ? (
