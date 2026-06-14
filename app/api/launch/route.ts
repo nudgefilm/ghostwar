@@ -61,16 +61,20 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // Check ammo
-  const { data: playerData, error: playerError } = await supabase
-    .from('players')
-    .select('missiles_remaining, nukes_remaining')
-    .eq('id', launcher_id)
-    .single()
+  // Check ammo + scorched earth debuff (parallel)
+  const [
+    { data: playerData, error: playerError },
+    { data: launcherCountryData },
+  ] = await Promise.all([
+    supabase.from('players').select('missiles_remaining, nukes_remaining').eq('id', launcher_id).single(),
+    supabase.from('countries').select('damage_percent').eq('code', launcher_country).single(),
+  ])
 
   if (playerError || !playerData) {
     return NextResponse.json({ error: 'PLAYER_NOT_FOUND' }, { status: 404 })
   }
+
+  const attacker_debuffed = (launcherCountryData?.damage_percent ?? 0) >= 100
 
   const ammoField = isNuke ? 'nukes_remaining' : 'missiles_remaining'
   const currentAmmo = isNuke
@@ -117,6 +121,7 @@ export async function POST(req: NextRequest) {
       quantity: qty,
       arrives_at,
       status: 'flying',
+      attacker_debuffed,
     })
     .select('id')
     .single()
@@ -146,5 +151,6 @@ export async function POST(req: NextRequest) {
     arrives_at,
     flight_seconds,
     nukes_earned: nukesEarned,
+    attacker_debuffed,
   })
 }

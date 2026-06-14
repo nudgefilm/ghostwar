@@ -242,6 +242,7 @@ export default function Home() {
       arrives_at?: string
       flight_seconds?: number
       nukes_earned?: number
+      attacker_debuffed?: boolean
       error?: string
     }>).catch(() => null)
 
@@ -445,6 +446,14 @@ export default function Home() {
                   [EXIT]
                 </button>
               </div>
+              {(countries[player.country_code]?.damage_percent ?? 0) >= 100 && (
+                <div
+                  className="mt-2 px-2 py-1 text-[10px] tracking-widest text-[#FF2233] text-center animate-pulse"
+                  style={{ background: 'rgba(255,34,51,0.15)' }}
+                >
+                  🔥 SCORCHED EARTH — ATTACK POWER -50%
+                </div>
+              )}
             </>
           ) : (
             <div className="text-zinc-600 text-[10px]">NOT AUTHENTICATED</div>
