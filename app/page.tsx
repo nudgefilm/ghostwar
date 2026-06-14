@@ -315,7 +315,7 @@ export default function Home() {
 
   const onNews = useCallback((item: NewsFeedRow) => {
     // Dedup by target_country: remove existing entry for this country, prepend new one, cap at 5
-    setRecentStrikes(prev => [item, ...prev.filter(n => n.target_country !== item.target_country)].slice(0, 5))
+    setRecentStrikes(prev => [item, ...prev.filter(n => n.target_country !== item.target_country)].slice(0, 3))
     setStrikeCount(prev => prev + 1)
     if (item.content?.includes('nuclear')) setNukeCount(prev => prev + 1)
   }, [])
@@ -772,7 +772,7 @@ export default function Home() {
                 flag: COUNTRY_FLAGS[targetCode] ?? '',
                 damage_percent: result.new_damage_percent,
               }
-              setDamagedRankings(prev => [rankEntry, ...prev.filter(e => e.code !== targetCode)].slice(0, 5))
+              setDamagedRankings(prev => [rankEntry, ...prev.filter(e => e.code !== targetCode)].slice(0, 3))
 
               // Scorched Earth ticker — fires for any country reaching 100% (player involvement not required)
               if (!result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100) {
@@ -1271,7 +1271,7 @@ export default function Home() {
       {/* ══ RIGHT PANEL ══ */}
       <aside className="fixed right-0 top-10 bottom-0 z-10 w-64 flex flex-col gap-2 p-2 pointer-events-none">
 
-        {/* LIVE STRIKES — 5-item real-time ticker, older items fade */}
+        {/* LIVE STRIKES — 3-item real-time ticker, older items fade */}
         <div className="pointer-events-auto p-3" style={CARD}>
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">LIVE STRIKES</div>
           {recentStrikes.length === 0 ? (
@@ -1279,7 +1279,7 @@ export default function Home() {
           ) : (
             <div className="flex flex-col gap-1">
               {recentStrikes.map((item, i) => {
-                const opacity = [1, 0.75, 0.5, 0.3, 0.15][i]
+                const opacity = [1, 0.6, 0.3][i]
                 return (
                   <button
                     key={item.id}
@@ -1324,24 +1324,26 @@ export default function Home() {
           )}
         </div>
 
-        {/* HALL OF FAME */}
-        <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">HALL OF FAME</div>
-          <div className="space-y-1.5">
-            <HofRow
-              entries={hofEntries.filter(e => e.action === 'nuke_launched')}
-              color="#FF6600"
-              empty="No nuclear strikes yet"
-              formatEntry={e => `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`}
-            />
-            <HofRow
-              entries={hofEntries.filter(e => e.action === 'nuke_intercepted')}
-              color="#00AAFF"
-              empty="No interceptions yet"
-              formatEntry={e => `🛡 ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} INTERCEPTED A NUKE`}
-            />
+        {/* HALL OF FAME — hidden when both rows are empty */}
+        {hofEntries.length > 0 && (
+          <div className="pointer-events-auto p-3" style={CARD}>
+            <div className="text-zinc-500 text-[10px] tracking-widest mb-2">HALL OF FAME</div>
+            <div className="space-y-1.5">
+              <HofRow
+                entries={hofEntries.filter(e => e.action === 'nuke_launched')}
+                color="#FF6600"
+                empty="No nuclear strikes yet"
+                formatEntry={e => `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`}
+              />
+              <HofRow
+                entries={hofEntries.filter(e => e.action === 'nuke_intercepted')}
+                color="#00AAFF"
+                empty="No interceptions yet"
+                formatEntry={e => `🛡 ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} INTERCEPTED A NUKE`}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* DAMAGE RANKINGS */}
         <div
