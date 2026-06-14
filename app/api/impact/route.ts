@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { COUNTRY_NAMES } from '@/lib/countries'
 
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>
@@ -82,6 +83,18 @@ export async function POST(req: NextRequest) {
     ? (dmgRows[0] as { new_stack: number; new_percent: number })
     : null
   const new_damage_percent: number = dmgRow ? Number(dmgRow.new_percent) : prev_damage_percent
+
+  // First time reaching 100% — broadcast DESTROYED news
+  if (prev_damage_percent < 100 && new_damage_percent >= 100) {
+    const countryName = COUNTRY_NAMES[target_country as string] ?? target_country
+    await supabase.from('news_feed').insert({
+      content: `💀 BREAKING: ${countryName} has been DESTROYED`,
+      launcher_country: missile.launcher_country,
+      target_country: target_country as string,
+      type: 'destroyed',
+      is_template: false,
+    })
+  }
 
   // Update total_kills and calculate rank (gracefully skip if column missing)
   let old_rank: number | null = null

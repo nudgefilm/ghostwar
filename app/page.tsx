@@ -186,6 +186,26 @@ export default function Home() {
 
   useRealtimeMissiles({ onMissile, onNews, onCountryUpdate })
 
+  // ── Recovery: 1% per minute for all damaged countries ─────────────────────
+  useEffect(() => {
+    const tick = () => {
+      fetch('/api/recover', { method: 'POST' })
+        .then(r => r.json())
+        .then((res: { updated?: { code: string; new_stack: number; new_percent: number }[] }) => {
+          res.updated?.forEach(row => {
+            setCountries(prev => {
+              const existing = prev[row.code]
+              if (!existing) return prev
+              return { ...prev, [row.code]: { ...existing, damage_stack: row.new_stack, damage_percent: row.new_percent } }
+            })
+          })
+        })
+        .catch(() => {})
+    }
+    const id = setInterval(tick, 60_000)
+    return () => clearInterval(id)
+  }, [])
+
   const handleEnter = (p: Player) => setPlayer(p)
 
   const handleLogout = () => {
@@ -483,9 +503,14 @@ export default function Home() {
             className="w-full bg-zinc-800/60 border border-zinc-700 text-zinc-300 text-[10px] px-2 py-1.5 mb-2 focus:outline-none focus:border-zinc-500 cursor-pointer"
           >
             <option value="">── SELECT TARGET ──</option>
-            {COUNTRIES.filter(c => c.code !== player?.country_code).map(c => (
-              <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
-            ))}
+            {COUNTRIES.filter(c => c.code !== player?.country_code).map(c => {
+              const destroyed = (countries[c.code]?.damage_percent ?? 0) >= 100
+              return (
+                <option key={c.code} value={c.code} disabled={destroyed}>
+                  {destroyed ? '💀' : c.flag} {c.name}{destroyed ? ' [DESTROYED]' : ''}
+                </option>
+              )
+            })}
           </select>
           {targetCountry && (
             <div className="flex items-center gap-2 mb-1">
@@ -626,9 +651,15 @@ export default function Home() {
                   <span className="text-zinc-500 text-xs w-4 shrink-0">#{i + 1}</span>
                   <TwemojiFlag code={c.code} size={16} className="shrink-0" />
                   <span className="text-zinc-200 text-xs w-16 truncate shrink-0">{c.name}</span>
-                  <DamageBar pct={c.damage_percent} />
+                  {c.damage_percent >= 100 ? (
+                    <span className="flex-1 text-[9px] tracking-widest text-[#FF2233] text-center font-bold mx-2">
+                      ◼ DESTROYED
+                    </span>
+                  ) : (
+                    <DamageBar pct={c.damage_percent} />
+                  )}
                   <span className="text-zinc-300 text-[10px] w-9 text-right shrink-0">
-                    {c.damage_percent > 0 ? `${Math.round(c.damage_percent)}%` : '< 1%'}
+                    {c.damage_percent >= 100 ? '100%' : c.damage_percent > 0 ? `${Math.round(c.damage_percent)}%` : '< 1%'}
                   </span>
                 </button>
               ))}
