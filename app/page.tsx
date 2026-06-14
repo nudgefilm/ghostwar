@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GlobeHandle } from '@/components/Globe'
 import EntryModal, { type Player } from '@/components/EntryModal'
+import TwemojiFlag from '@/components/TwemojiFlag'
 import { useRealtimeMissiles, type NewsFeedRow, type CountryRow } from '@/hooks/useRealtimeMissiles'
 import { createClient } from '@/lib/supabase/client'
 import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/countries'
@@ -298,7 +299,7 @@ export default function Home() {
         </div>
         <div className="shrink-0 text-zinc-300 text-[10px] tracking-wider">
           {player ? (
-            <span>{COUNTRY_FLAGS[player.country_code]} {player.nickname}</span>
+            <span><TwemojiFlag code={player.country_code} size={14} className="mr-1" /> {player.nickname}</span>
           ) : (
             'UNIDENTIFIED'
           )}
@@ -317,7 +318,7 @@ export default function Home() {
           {player ? (
             <>
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl leading-none">{COUNTRY_FLAGS[player.country_code]}</span>
+                <TwemojiFlag code={player.country_code} size={32} />
                 <div>
                   <div className="text-zinc-200 text-sm font-bold tracking-wide">{player.nickname}</div>
                   <div className="text-zinc-200 text-sm">{COUNTRY_NAMES[player.country_code]}</div>
@@ -397,7 +398,7 @@ export default function Home() {
           </select>
           {targetCountry && (
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-base leading-none">{COUNTRY_FLAGS[targetCountry]}</span>
+              <TwemojiFlag code={targetCountry} size={20} />
               <span className="text-zinc-200 text-sm">{COUNTRY_NAMES[targetCountry]}</span>
             </div>
           )}
@@ -499,7 +500,7 @@ export default function Home() {
             <div className="overflow-hidden h-7">
               <div className="flags-scroll flex gap-2 w-max">
                 {[...onlineCountries, ...onlineCountries].map((c, i) => (
-                  <span key={i} title={c.name} className="text-xl leading-none">{c.flag}</span>
+                  <TwemojiFlag key={i} code={c.code} size={22} />
                 ))}
               </div>
             </div>
@@ -526,7 +527,7 @@ export default function Home() {
                   className="w-full flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
                 >
                   <span className="text-zinc-500 text-xs w-4 shrink-0">#{i + 1}</span>
-                  <span className="text-sm shrink-0">{c.flag}</span>
+                  <TwemojiFlag code={c.code} size={16} className="shrink-0" />
                   <span className="text-zinc-200 text-xs w-16 truncate shrink-0">{c.name}</span>
                   <DamageBar pct={c.damage_percent} />
                   <span className="text-zinc-300 text-[10px] w-9 text-right shrink-0">
