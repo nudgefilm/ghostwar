@@ -68,11 +68,22 @@ const CARD: React.CSSProperties = {
   border: '1px solid rgba(255,34,51,0.18)',
 }
 
+// ── Incoming threat ───────────────────────────────────────────────────────────
+interface IncomingThreat {
+  id: string
+  launcher_country: string
+  quantity: number
+  type: 'missile' | 'nuke'
+  arrives_at: string
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Home() {
   const globeRef = useRef<GlobeHandle>(null)
   const launchingRef = useRef(false)
   const processedMissileIdsRef = useRef<Set<string>>(new Set())
+  const interceptedMissilesRef = useRef<Set<string>>(new Set())
+  const threatResolvedRef = useRef<Set<string>>(new Set())
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [targetCountry, setTargetCountry] = useState<string | null>(null)
@@ -93,6 +104,23 @@ export default function Home() {
   const [showRules, setShowRules] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  // ── Defense system state ──────────────────────────────────────────────────
+  const [incomingThreats, setIncomingThreats] = useState<IncomingThreat[]>([])
+  const [defenseReadiness, setDefenseReadiness] = useState(0)
+  const [nukeInterceptArmed, setNukeInterceptArmed] = useState(false)
+  const [interceptNotif, setInterceptNotif] = useState<string | null>(null)
+  const [tick, setTick] = useState(0)
+
+  // Stable ref for current defense state (used in setInterval closure)
+  const defenseStateRef = useRef({
+    player: null as Player | null,
+    nukes: 0,
+    defenseReadiness: 0,
+    nukeInterceptArmed: false,
+    incomingThreats: [] as IncomingThreat[],
+  })
+  defenseStateRef.current = { player, nukes, defenseReadiness, nukeInterceptArmed, incomingThreats }
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -153,6 +181,24 @@ export default function Home() {
         setInterceptAlert(`⚠ INCOMING: ${missile.launcher_country} → ${missile.target_country}`)
         setTimeout(() => setInterceptAlert(null), 4000)
       }
+
+      // Track incoming threats for interception
+      if (
+        missile.target_country === player?.country_code &&
+        missile.launcher_id !== player?.id
+      ) {
+        setIncomingThreats(prev => {
+          if (prev.some(t => t.id === missile.id)) return prev
+          return [...prev, {
+            id: missile.id,
+            launcher_country: missile.launcher_country,
+            quantity: missile.quantity,
+            type: missile.type as 'missile' | 'nuke',
+            arrives_at: missile.arrives_at,
+          }]
+        })
+      }
+
       if (missile.launcher_country !== player?.country_code) {
         const fromCoords = COUNTRY_COORDS[missile.launcher_country]
         const toCoords = COUNTRY_COORDS[missile.target_country]
@@ -175,7 +221,7 @@ export default function Home() {
         }
       }
     },
-    [player?.country_code],
+    [player?.country_code, player?.id],
   )
 
   const onNews = useCallback((item: NewsFeedRow) => {
@@ -209,6 +255,75 @@ export default function Home() {
     const id = setInterval(tick, 60_000)
     return () => clearInterval(id)
   }, [])
+
+  // ── Defense countdown + interception resolution ────────────────────────────
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick(t => t + 1)
+
+      const { incomingThreats, defenseReadiness, nukeInterceptArmed, nukes, player } =
+        defenseStateRef.current
+      if (incomingThreats.length === 0) return
+
+      const now = Date.now()
+      const toResolve: IncomingThreat[] = []
+
+      for (const t of incomingThreats) {
+        const remaining = (new Date(t.arrives_at).getTime() - now) / 1000
+        if (remaining <= 0 && !threatResolvedRef.current.has(t.id)) {
+          threatResolvedRef.current.add(t.id)
+          toResolve.push(t)
+        }
+      }
+
+      for (const threat of toResolve) {
+        let intercepted = false
+        let useNuke = false
+
+        if (threat.type === 'nuke') {
+          intercepted = nukeInterceptArmed && nukes > 0
+          useNuke = intercepted
+        } else {
+          intercepted = Math.random() < defenseReadiness / 100
+        }
+
+        if (intercepted) {
+          interceptedMissilesRef.current.add(threat.id)
+          globeRef.current?.markIntercepted(threat.id)
+
+          if (useNuke) setNukes(prev => Math.max(0, prev - 1))
+
+          SoundEngine.init()
+          SoundEngine.playIntercept()
+          setInterceptNotif('🛡️ INTERCEPTED!')
+          setTimeout(() => setInterceptNotif(null), 2000)
+
+          if (player) {
+            fetch('/api/intercept', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                missile_id: threat.id,
+                intercepted: true,
+                player_id: player.id,
+                player_nickname: player.nickname,
+                player_country_code: player.country_code,
+              }),
+            }).catch(() => {})
+          }
+        }
+        // Not intercepted: Globe's natural onImpact → /api/impact handles it
+      }
+
+      if (toResolve.length > 0) {
+        const resolvedIds = new Set(toResolve.map(t => t.id))
+        setIncomingThreats(prev => prev.filter(t => !resolvedIds.has(t.id)))
+        setDefenseReadiness(0)
+        setNukeInterceptArmed(false)
+      }
+    }, 500)
+    return () => clearInterval(timer)
+  }, [])  // stable: reads from defenseStateRef
 
   const handleEnter = (p: Player) => {
     setPlayer(p)
@@ -309,6 +424,17 @@ export default function Home() {
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
+  const primaryThreat = incomingThreats.length > 0
+    ? [...incomingThreats].sort(
+        (a, b) => new Date(a.arrives_at).getTime() - new Date(b.arrives_at).getTime(),
+      )[0]
+    : null
+  // tick forces re-computation of timeRemaining every 500ms
+  void tick
+  const primaryTimeRemaining = primaryThreat
+    ? Math.max(0, Math.round((new Date(primaryThreat.arrives_at).getTime() - Date.now()) / 1000))
+    : 0
+
   const sortedCountries = Object.values(countries)
     .filter(c => (c.damage_stack ?? 0) > 0)
     .sort((a, b) => b.damage_stack - a.damage_stack)
@@ -344,17 +470,27 @@ export default function Home() {
         </div>
       )}
 
+      {/* Intercept success notification */}
+      {interceptNotif && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 border border-[#00AAFF] bg-[#00AAFF]/10 text-[#00AAFF] text-xs tracking-widest">
+          {interceptNotif}
+        </div>
+      )}
+
       {/* Globe — full screen */}
       <div className="fixed inset-0 z-0" style={{ width: '100vw', height: '100vh' }}>
         <Globe ref={globeRef} onImpact={(data: ImpactData) => {
           SoundEngine.init()
-          SoundEngine.playImpact()
           setActiveCount(prev => Math.max(0, prev - 1))
 
           if (!data.missileId || !data.targetCountry) return
+          // Skip missiles that were intercepted (Globe already showed blue explosion)
+          if (interceptedMissilesRef.current.has(data.missileId)) return
           // Deduplicate: only process once per missile_id across quantity > 1 animations
           if (processedMissileIdsRef.current.has(data.missileId)) return
           processedMissileIdsRef.current.add(data.missileId)
+
+          SoundEngine.playImpact()
 
           fetch('/api/impact', {
             method: 'POST',
@@ -626,21 +762,73 @@ export default function Home() {
         </div>
 
         {/* DEFENSE */}
-        <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
-          <button
-            disabled
-            className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-500 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
+        {primaryThreat ? (
+          <div
+            className="pointer-events-auto p-3 animate-pulse"
+            style={{ ...CARD, background: 'rgba(255,34,51,0.15)', borderColor: 'rgba(255,34,51,0.5)' }}
           >
-            🛡️ INTERCEPT
-          </button>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-              <div className="h-full bg-zinc-600" style={{ width: '0%' }} />
+            <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold">DEFENSE SYSTEMS</div>
+            <div className="text-[#FF2233] text-[10px] mb-2 font-bold leading-snug">
+              ⚠ {primaryThreat.launcher_country} LAUNCHED {primaryThreat.quantity}{' '}
+              {primaryThreat.type.toUpperCase()}(S). IMPACT IN {primaryTimeRemaining}s
             </div>
-            <span className="text-zinc-600 text-[10px]">0%</span>
+            {primaryThreat.type === 'nuke' ? (
+              nukes > 0 ? (
+                <button
+                  onClick={() => setNukeInterceptArmed(v => !v)}
+                  className={`w-full py-1.5 mb-2 text-[10px] tracking-widest border transition-colors cursor-pointer ${
+                    nukeInterceptArmed
+                      ? 'bg-orange-900/60 border-orange-600 text-orange-300'
+                      : 'bg-zinc-800/60 border-zinc-600 text-zinc-300 hover:border-orange-700'
+                  }`}
+                >
+                  {nukeInterceptArmed ? '☢️ NUKE ARMED ✓' : '🛡️ USE NUKE TO INTERCEPT'}
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-500 text-[10px] tracking-widest opacity-40 cursor-not-allowed"
+                >
+                  ☢️ NO NUKES AVAILABLE
+                </button>
+              )
+            ) : (
+              <button
+                onClick={() => setDefenseReadiness(prev => Math.min(100, prev + 5))}
+                className="w-full py-1.5 mb-2 bg-red-900/60 border border-red-700 text-red-300 text-[10px] tracking-widest cursor-pointer hover:bg-red-800/60 active:bg-red-700/60 transition-colors"
+              >
+                🛡️ INTERCEPT ({defenseReadiness}%)
+              </button>
+            )}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-[#FF2233] transition-all duration-200"
+                  style={{ width: `${primaryThreat.type === 'nuke' ? (nukeInterceptArmed ? 100 : 0) : defenseReadiness}%` }}
+                />
+              </div>
+              <span className="text-[#FF2233] text-[10px]">
+                {primaryThreat.type === 'nuke' ? (nukeInterceptArmed ? '100%' : '0%') : `${defenseReadiness}%`}
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="pointer-events-auto p-3" style={CARD}>
+            <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
+            <button
+              disabled
+              className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-500 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
+            >
+              🛡️ INTERCEPT
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                <div className="h-full bg-zinc-600" style={{ width: '0%' }} />
+              </div>
+              <span className="text-zinc-600 text-[10px]">0%</span>
+            </div>
+          </div>
+        )}
 
       </aside>
 
