@@ -14,6 +14,8 @@ export interface BattleReportData {
   economicDamage: string
   oldRank: number | null
   newRank: number | null
+  attacker_debuffed?: boolean
+  targetDestroyed?: boolean
 }
 
 interface Props {
@@ -99,6 +101,22 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
               </div>
             ))}
           </div>
+
+          {/* Contextual notes */}
+          {(report.attacker_debuffed || report.targetDestroyed) && (
+            <div className="space-y-1 mb-3">
+              {report.attacker_debuffed && (
+                <div className="text-[10px]" style={{ color: '#FF6600' }}>
+                  ⚠ Your attack power was reduced 50% (Scorched Earth status)
+                </div>
+              )}
+              {report.targetDestroyed && (
+                <div className="text-[10px] font-bold text-[#FF2233]">
+                  ☠ {report.targetCountry} has been SCORCHED — their attack power is now reduced 50%
+                </div>
+              )}
+            </div>
+          )}
 
           {report.role === 'victim' && (
             <>

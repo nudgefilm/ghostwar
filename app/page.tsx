@@ -6,6 +6,7 @@ import type { GlobeHandle, ImpactData } from '@/components/Globe'
 import EntryModal, { type Player } from '@/components/EntryModal'
 import TwemojiFlag from '@/components/TwemojiFlag'
 import BattleReportModal, { type BattleReportData } from '@/components/BattleReportModal'
+import RulesModal from '@/components/RulesModal'
 import { useRealtimeMissiles, type NewsFeedRow, type CountryRow } from '@/hooks/useRealtimeMissiles'
 import { createClient } from '@/lib/supabase/client'
 import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/countries'
@@ -89,6 +90,9 @@ export default function Home() {
   const [nukeCount, setNukeCount] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
   const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
+  const [showRules, setShowRules] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -206,12 +210,35 @@ export default function Home() {
     return () => clearInterval(id)
   }, [])
 
-  const handleEnter = (p: Player) => setPlayer(p)
+  const handleEnter = (p: Player) => {
+    setPlayer(p)
+    if (!localStorage.getItem('ghostwar_rules_seen')) {
+      setShowRules(true)
+    }
+  }
+
+  const handleRulesClose = () => {
+    localStorage.setItem('ghostwar_rules_seen', 'true')
+    setShowRules(false)
+  }
 
   const handleLogout = () => {
     try { localStorage.removeItem('ghostwar_player') } catch { /* ignore */ }
     setPlayer(null)
+    setDropdownOpen(false)
   }
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!dropdownOpen) return
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [dropdownOpen])
 
   // ── Handle launch ─────────────────────────────────────────────────────────
   const handleLaunch = async () => {
@@ -339,6 +366,7 @@ export default function Home() {
               success: boolean; already_processed: boolean
               launcher_id: string; launcher_country: string
               quantity: number; type: string
+              attacker_debuffed: boolean
               prev_damage_percent: number; new_damage_percent: number
               old_rank: number | null; new_rank: number | null
             }) => {
@@ -369,6 +397,8 @@ export default function Home() {
                 economicDamage,
                 oldRank: result.old_rank,
                 newRank: result.new_rank,
+                attacker_debuffed: !!isAttacker && (result.attacker_debuffed ?? false),
+                targetDestroyed: !result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100,
               }
               // Nuke: wait for mushroom cloud to finish before showing modal
               const modalDelay = type === 'nuke' ? 5500 : 0
@@ -378,6 +408,9 @@ export default function Home() {
             .catch(() => {})
         }} />
       </div>
+
+      {/* Rules Modal */}
+      {showRules && <RulesModal onClose={handleRulesClose} />}
 
       {/* Battle Report Modal */}
       {battleReport && (
@@ -407,10 +440,37 @@ export default function Home() {
         </div>
         <div className="shrink-0 text-[10px] tracking-wider">
           {player ? (
-            <div className="group flex items-center gap-1.5 cursor-pointer" onClick={handleLogout}>
-              <TwemojiFlag code={player.country_code} size={14} />
-              <span className="text-zinc-300 group-hover:text-zinc-500 transition-colors">{player.nickname}</span>
-              <span className="text-[#FF2233] tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">[LOGOUT]</span>
+            <div ref={dropdownRef} className="relative">
+              <div
+                className="flex items-center gap-1.5 cursor-pointer text-zinc-300 hover:text-white transition-colors select-none"
+                onClick={() => setDropdownOpen(p => !p)}
+                onMouseEnter={() => setDropdownOpen(true)}
+              >
+                <TwemojiFlag code={player.country_code} size={14} />
+                <span>{player.nickname}</span>
+                <span className="text-zinc-500 text-[9px]">▾</span>
+              </div>
+              {dropdownOpen && (
+                <div
+                  className="absolute top-full right-0 mt-1 min-w-[130px] z-50"
+                  style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,34,51,0.2)' }}
+                  onMouseLeave={() => setDropdownOpen(false)}
+                >
+                  <button
+                    onClick={() => { setShowRules(true); setDropdownOpen(false) }}
+                    className="w-full text-left px-3 py-2 text-[10px] tracking-widest text-zinc-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                  >
+                    ❓ RULES
+                  </button>
+                  <div className="border-t mx-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+                  <button
+                    onClick={handleLogout}
+                    className="w-full text-left px-3 py-2 text-[10px] tracking-widest text-zinc-300 hover:text-[#FF2233] hover:bg-[#FF2233]/5 transition-colors cursor-pointer"
+                  >
+                    🚪 LOGOUT
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <span className="text-zinc-500">UNIDENTIFIED</span>
