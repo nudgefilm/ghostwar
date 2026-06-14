@@ -1236,6 +1236,21 @@ export default function Home() {
         </div>
 
       </aside>
+
+      {/* Footer */}
+      <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-2 py-1.5 pointer-events-none"
+        style={{ background: 'rgba(0,0,0,0.55)' }}
+      >
+        <span className="text-[9px] text-zinc-700">© 2026 Ghost War</span>
+        <span className="text-[9px] text-zinc-700">│</span>
+        <a href="#" className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto">Operator Info</a>
+        <span className="text-[9px] text-zinc-700">│</span>
+        <a href="#" className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto">Privacy</a>
+        <span className="text-[9px] text-zinc-700">│</span>
+        <a href="#" className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto">Terms</a>
+        <span className="text-[9px] text-zinc-700">│</span>
+        <a href="https://discord.gg/5QhFyQSPn4" target="_blank" rel="noopener noreferrer" className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto">Discord</a>
+      </footer>
     </div>
   )
 }
