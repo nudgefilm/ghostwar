@@ -61,6 +61,53 @@ function DamageBar({ pct }: { pct: number }) {
   )
 }
 
+// ── Hall of Fame row: static when 1 entry, cycling fade when multiple ─────────
+function HofRow({
+  entries,
+  color,
+  empty,
+  formatEntry,
+}: {
+  entries: { nickname: string; country_code: string }[]
+  color: string
+  empty: string
+  formatEntry: (e: { nickname: string; country_code: string }) => string
+}) {
+  const [idx, setIdx] = useState(0)
+  const [opacity, setOpacity] = useState(1)
+
+  useEffect(() => {
+    setIdx(0)
+    setOpacity(1)
+    if (entries.length <= 1) return
+    let fadeTimer: ReturnType<typeof setTimeout> | null = null
+    const id = setInterval(() => {
+      setOpacity(0)
+      fadeTimer = setTimeout(() => {
+        setIdx(prev => (prev + 1) % entries.length)
+        setOpacity(1)
+      }, 300)
+    }, 3000)
+    return () => {
+      clearInterval(id)
+      if (fadeTimer) clearTimeout(fadeTimer)
+    }
+  }, [entries.length])
+
+  if (entries.length === 0) {
+    return <div className="text-[10px] text-center" style={{ color: '#3f3f46' }}>{empty}</div>
+  }
+  const e = entries[Math.min(idx, entries.length - 1)]
+  return (
+    <div
+      className="text-[10px] text-center truncate font-mono tracking-wider"
+      style={{ color, opacity, transition: 'opacity 0.3s ease' }}
+    >
+      {formatEntry(e)}
+    </div>
+  )
+}
+
 // ── Card wrapper style ────────────────────────────────────────────────────────
 const CARD: React.CSSProperties = {
   background: 'rgba(0,0,0,0.8)',
@@ -107,7 +154,6 @@ export default function Home() {
   const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
   const [showRules, setShowRules] = useState(false)
   const [hofEntries, setHofEntries] = useState<{ nickname: string; country_code: string; action: string }[]>([])
-  const [hofPhase, setHofPhase] = useState<'status' | 'hof'>('status')
   const [alliances, setAlliances] = useState<{ country_a: string; country_b: string; request_count: number; status: string }[]>([])
   const [showAllianceDropdown, setShowAllianceDropdown] = useState(false)
   const [allianceTarget, setAllianceTarget] = useState('')
@@ -311,13 +357,6 @@ export default function Home() {
     const id = setInterval(fetchHof, 30_000)
     return () => clearInterval(id)
   }, [])
-
-  // ── Hall of Fame: alternate war status ↔ HoF ticker every 5s ─────────────
-  useEffect(() => {
-    if (hofEntries.length === 0) { setHofPhase('status'); return }
-    const id = setInterval(() => setHofPhase(p => p === 'status' ? 'hof' : 'status'), 5000)
-    return () => clearInterval(id)
-  }, [hofEntries.length])
 
   // ── Alliance data: fetch on login + poll every 30s ────────────────────────
   const fetchAlliances = useCallback(() => {
@@ -722,27 +761,10 @@ export default function Home() {
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
           <span className="text-zinc-500 text-[10px]">// GLOBAL WARFARE SIM</span>
         </div>
-        <div className="flex-1 relative overflow-hidden h-full">
-          {/* War Status Bar */}
-          <span
-            className="absolute inset-0 flex items-center justify-center text-zinc-400 text-[10px] tracking-wider whitespace-nowrap pointer-events-none transition-opacity duration-500"
-            style={{ opacity: hofPhase === 'status' ? 1 : 0 }}
-          >
+        <div className="flex-1 flex items-center justify-center overflow-hidden">
+          <span className="text-zinc-400 text-[10px] tracking-wider whitespace-nowrap">
             {new Date().toISOString().slice(0, 10)} │ {onlineNations.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
           </span>
-          {/* Hall of Fame Ticker — same inset-0 bounds as war status, static centered text */}
-          {hofEntries.length > 0 && (
-            <span
-              className="absolute inset-0 flex items-center justify-center text-amber-400 text-[10px] tracking-wider font-mono truncate pointer-events-none transition-opacity duration-500"
-              style={{ opacity: hofPhase === 'hof' ? 1 : 0 }}
-            >
-              {hofEntries.map(e =>
-                e.action === 'nuke_launched'
-                  ? `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`
-                  : `🛡 ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} INTERCEPTED A NUKE`
-              ).join('  │  ')}
-            </span>
-          )}
         </div>
         <div className="shrink-0 text-[10px] tracking-wider">
           {player ? (
@@ -1154,6 +1176,25 @@ export default function Home() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* HALL OF FAME */}
+        <div className="pointer-events-auto p-3" style={CARD}>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">HALL OF FAME</div>
+          <div className="space-y-1.5">
+            <HofRow
+              entries={hofEntries.filter(e => e.action === 'nuke_launched')}
+              color="#FF6600"
+              empty="No nuclear strikes yet"
+              formatEntry={e => `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`}
+            />
+            <HofRow
+              entries={hofEntries.filter(e => e.action === 'nuke_intercepted')}
+              color="#00AAFF"
+              empty="No interceptions yet"
+              formatEntry={e => `🛡 ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} INTERCEPTED A NUKE`}
+            />
+          </div>
         </div>
 
         {/* DAMAGE RANKINGS */}
