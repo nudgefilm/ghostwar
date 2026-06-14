@@ -28,7 +28,11 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
   useEffect(() => {
     const t = setTimeout(onClose, 3000)
     return () => clearTimeout(t)
-  }, [onClose])
+  // onClose is an inline arrow in the parent — dep must be [] or the timer
+  // resets on every parent re-render (Supabase ticks) and never fires.
+  // Component mounts fresh per report, so [] is safe here.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const rankDiff = report.oldRank != null && report.newRank != null
     ? report.oldRank - report.newRank

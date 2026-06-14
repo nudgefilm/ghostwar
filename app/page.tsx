@@ -854,31 +854,33 @@ export default function Home() {
       {/* ══ RIGHT PANEL ══ */}
       <aside className="fixed right-0 top-10 bottom-0 z-10 w-64 flex flex-col gap-2 p-2 pointer-events-none">
 
-        {/* LIVE STRIKES — 3-item real-time ticker */}
+        {/* LIVE STRIKES — 5-item real-time ticker, older items fade */}
         <div className="pointer-events-auto p-3" style={CARD}>
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">LIVE STRIKES</div>
           {news.length === 0 ? (
             <div className="text-zinc-500 text-[10px]">Awaiting first strike...</div>
           ) : (
             <div className="flex flex-col gap-1">
-              {news.slice(0, 3).map((item, i) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    const code = item.target_country
-                    if (!code) return
-                    const coords = COUNTRY_COORDS[code]
-                    if (coords) globeRef.current?.flyTo(coords[0], coords[1])
-                  }}
-                  className={`w-full text-left cursor-pointer hover:opacity-80 transition-opacity border-l-2 pl-2 py-0.5 ${
-                    i === 0 ? 'border-[#FF2233]' : 'border-[#FF2233]/25'
-                  }`}
-                >
-                  <p className={`text-[10px] leading-[1.35] ${i === 0 ? 'text-zinc-200' : 'text-zinc-500'}`}>
-                    <TypewriterText text={item.content} instant={i !== 0} speed={18} />
-                  </p>
-                </button>
-              ))}
+              {news.slice(0, 5).map((item, i) => {
+                const opacity = [1, 0.75, 0.5, 0.3, 0.15][i]
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      const code = item.target_country
+                      if (!code) return
+                      const coords = COUNTRY_COORDS[code]
+                      if (coords) globeRef.current?.flyTo(coords[0], coords[1])
+                    }}
+                    className="w-full text-left cursor-pointer hover:opacity-100 transition-opacity border-l-2 pl-2 py-0.5 border-[#FF2233]"
+                    style={{ opacity }}
+                  >
+                    <p className="text-[10px] leading-[1.35] text-zinc-200">
+                      <TypewriterText text={item.content} instant={i !== 0} speed={18} />
+                    </p>
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
