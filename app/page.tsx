@@ -7,6 +7,7 @@ import EntryModal, { type Player } from '@/components/EntryModal'
 import TwemojiFlag from '@/components/TwemojiFlag'
 import BattleReportModal, { type BattleReportData } from '@/components/BattleReportModal'
 import RulesModal from '@/components/RulesModal'
+import InfoModal from '@/components/InfoModal'
 import { useRealtimeMissiles, type NewsFeedRow, type CountryRow } from '@/hooks/useRealtimeMissiles'
 import { createClient } from '@/lib/supabase/client'
 import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/countries'
@@ -153,6 +154,7 @@ export default function Home() {
   const [activeCount, setActiveCount] = useState(0)
   const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
   const [showRules, setShowRules] = useState(false)
+  const [infoModal, setInfoModal] = useState<'operator' | 'privacy' | 'terms' | null>(null)
   const [hofEntries, setHofEntries] = useState<{ nickname: string; country_code: string; action: string }[]>([])
   const [alliances, setAlliances] = useState<{ country_a: string; country_b: string; request_count: number; status: string }[]>([])
   const [showAllianceDropdown, setShowAllianceDropdown] = useState(false)
@@ -740,6 +742,70 @@ export default function Home() {
       {/* Rules Modal */}
       {showRules && <RulesModal onClose={handleRulesClose} />}
 
+      {/* Operator Info Modal */}
+      {infoModal === 'operator' && (
+        <InfoModal title="OPERATOR INFORMATION" onClose={() => setInfoModal(null)}>
+          <div className="space-y-3">
+            {([
+              ['Service', 'Global Ghost War'],
+              ['Operator', 'UNFOLD LAB'],
+              ['Representative', 'JAEWOO JUNG'],
+              ['Business Registration No.', '136-11-23540'],
+              ['Address', '214-S46, 46, Apgujeong-ro 2-gil, Gangnam-gu, Seoul, 06034, Republic of Korea'],
+              ['Contact', 'nudgefilm@gmail.com'],
+            ] as [string, string][]).map(([label, value]) => (
+              <div key={label}>
+                <div className="text-zinc-500 text-[9px] tracking-wider uppercase mb-0.5">{label}</div>
+                <div className="text-zinc-200 text-[10px]">{value}</div>
+              </div>
+            ))}
+          </div>
+        </InfoModal>
+      )}
+
+      {/* Privacy Policy Modal */}
+      {infoModal === 'privacy' && (
+        <InfoModal title="PRIVACY POLICY" onClose={() => setInfoModal(null)}>
+          <div className="space-y-3 text-[10px] text-zinc-400 leading-relaxed">
+            <p>Global Ghost War collects minimal information necessary for gameplay:</p>
+            <ul className="space-y-1 ml-2">
+              <li>— Nickname (chosen by you, stored to identify your account)</li>
+              <li>— Country selection (your chosen nation for gameplay)</li>
+              <li>— Gameplay statistics (missiles fired, damage dealt, rankings)</li>
+            </ul>
+            <div>
+              <div className="text-zinc-200 font-bold mb-1">We do NOT collect:</div>
+              <ul className="space-y-1 ml-2">
+                <li>— Real names, email addresses, or contact information</li>
+                <li>— IP addresses for tracking purposes</li>
+                <li>— Payment information (handled by third-party processors if/when purchases are available)</li>
+              </ul>
+            </div>
+            <p>Data is stored securely via Supabase and is used solely to provide game functionality (session persistence, leaderboards, real-time multiplayer features).</p>
+            <p>You may request account data deletion by contacting: <span className="text-zinc-300">nudgefilm@gmail.com</span></p>
+            <p className="text-zinc-600">Last updated: 2026-06-14</p>
+          </div>
+        </InfoModal>
+      )}
+
+      {/* Terms of Service Modal */}
+      {infoModal === 'terms' && (
+        <InfoModal title="TERMS OF SERVICE" onClose={() => setInfoModal(null)}>
+          <div className="space-y-3 text-[10px] text-zinc-400 leading-relaxed">
+            <p>Global Ghost War is a fictional, satirical strategy simulation game created for entertainment purposes only.</p>
+            <ul className="space-y-1.5 ml-2">
+              <li>— All nation representations, conflicts, and &quot;attacks&quot; depicted are part of a game mechanic and do not reflect real-world events, political positions, or endorsements.</li>
+              <li>— By using this service, you agree to engage respectfully with other players. Harassment, hate speech, or abuse directed at other users (regardless of in-game &quot;nationality&quot;) is prohibited.</li>
+              <li>— The operator (UNFOLD LAB) reserves the right to suspend or terminate accounts that violate these terms.</li>
+              <li>— This service is provided &quot;as is&quot; without warranties. The operator is not liable for service interruptions, data loss, or any damages arising from use of this game.</li>
+              <li>— Game rules, mechanics, and features (see RULES OF ENGAGEMENT) may change at any time without prior notice.</li>
+            </ul>
+            <p>For questions, contact: <span className="text-zinc-300">nudgefilm@gmail.com</span></p>
+            <p className="text-zinc-600">Last updated: 2026-06-14</p>
+          </div>
+        </InfoModal>
+      )}
+
       {/* Battle Report Modal */}
       {battleReport && (
         <BattleReportModal
@@ -1243,11 +1309,11 @@ export default function Home() {
       >
         <span className="text-[9px] text-zinc-700">© 2026 Ghost War</span>
         <span className="text-[9px] text-zinc-700">│</span>
-        <a href="#" className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto">Operator Info</a>
+        <button onClick={() => setInfoModal('operator')} className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Operator Info</button>
         <span className="text-[9px] text-zinc-700">│</span>
-        <a href="#" className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto">Privacy</a>
+        <button onClick={() => setInfoModal('privacy')} className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Privacy</button>
         <span className="text-[9px] text-zinc-700">│</span>
-        <a href="#" className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto">Terms</a>
+        <button onClick={() => setInfoModal('terms')} className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Terms</button>
         <span className="text-[9px] text-zinc-700">│</span>
         <a href="https://discord.gg/5QhFyQSPn4" target="_blank" rel="noopener noreferrer" className="text-[9px] text-zinc-700 hover:text-[#FF2233] transition-colors pointer-events-auto">Discord</a>
       </footer>
