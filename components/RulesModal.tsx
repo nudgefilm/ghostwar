@@ -1,16 +1,16 @@
 'use client'
 
-// Last updated: 2026-06-14 — Added Scorched Earth, Recovery, Defense Systems
+// Last updated: 2026-06-14
 const GAME_RULES: { icon: string; title: string; text: string }[] = [
-  { icon: '🚀', title: 'MISSILES',       text: '100 free daily (resets 00:00 UTC)' },
-  { icon: '☢',  title: 'NUKES',          text: 'Earn 1 nuke per 1,000 missiles fired' },
-  { icon: '💥', title: 'DAMAGE',         text: 'Each hit accumulates. 10 weighted hits = +1% damage (nukes count as 50×)' },
+  { icon: '🚀', title: 'MISSILES',      text: '100 free daily (00:00 UTC / 09:00 KST)' },
+  { icon: '☢',  title: 'NUKES',         text: 'Earn 1 nuke per 1,000 missiles fired' },
+  { icon: '💥', title: 'DAMAGE',        text: 'Each hit accumulates. 10 weighted hits = +1% damage (nukes count as 50×)' },
   { icon: '☠',  title: 'SCORCHED EARTH', text: "At 100% damage, that nation's attacks are reduced 50% until recovery" },
-  { icon: '🔄', title: 'RECOVERY',       text: 'All nations recover 10% damage daily at 00:00 UTC' },
-  { icon: '🏆', title: 'RANKINGS',       text: 'Climb the leaderboard by landing successful strikes' },
-  { icon: '🛡️', title: 'DEFENSE',        text: 'Click INTERCEPT rapidly when under attack to build up interception chance. Nukes can only be intercepted by nukes.' },
-  { icon: '🤝', title: 'ALLIANCES',      text: 'Allied nations deal reduced damage to each other (5% per alliance point, max 50%). Attacking an ally breaks the alliance.' },
-  // FUTURE RULES GO HERE — just add new objects to this array
+  { icon: '🔄', title: 'RECOVERY',      text: 'Nations recover 10% damage daily at 00:00 UTC' },
+  { icon: '🏆', title: 'RANKINGS',      text: 'Climb the leaderboard by landing successful strikes' },
+  { icon: '🛡️', title: 'DEFENSE',       text: 'Click INTERCEPT rapidly when under attack to build up interception chance. Nukes can only be intercepted by nukes.' },
+  { icon: '🤝', title: 'ALLIANCES',     text: 'Mutual requests build alliance strength (5% damage reduction each, max 50%). Attacking an ally breaks it.' },
+  { icon: '🏛',  title: 'HALL OF FAME', text: 'Nuclear strikes & interceptions are recorded for 30 days.' },
 ]
 
 interface Props {
