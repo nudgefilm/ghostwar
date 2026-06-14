@@ -57,10 +57,18 @@ function DamageBar({ pct }: { pct: number }) {
   )
 }
 
+// ── Card wrapper style ────────────────────────────────────────────────────────
+const CARD: React.CSSProperties = {
+  background: 'rgba(0,0,0,0.55)',
+  backdropFilter: 'blur(12px)',
+  WebkitBackdropFilter: 'blur(12px)',
+  border: '1px solid rgba(255,34,51,0.18)',
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function Home() {
   const globeRef = useRef<GlobeHandle>(null)
-  const launchingRef = useRef(false) // ref guard against double-tap race
+  const launchingRef = useRef(false)
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [targetCountry, setTargetCountry] = useState<string | null>(null)
@@ -99,7 +107,6 @@ export default function Home() {
       if (!p.id || !p.nickname || !p.country_code) return
       setPlayer(p)
 
-      // Refresh ammo from DB
       const supabase = createClient()
       supabase
         .from('players')
@@ -120,14 +127,12 @@ export default function Home() {
   // ── Realtime callbacks ────────────────────────────────────────────────────
   const onMissile = useCallback(
     (missile: import('@/hooks/useRealtimeMissiles').MissileRow) => {
-      // Incoming attack on our country
       if (missile.target_country === player?.country_code) {
         SoundEngine.init()
         SoundEngine.playAlert()
         setInterceptAlert(`⚠ INCOMING: ${missile.launcher_country} → ${missile.target_country}`)
         setTimeout(() => setInterceptAlert(null), 4000)
       }
-      // Animate other nations' missiles on globe (skip our own country's launches)
       if (missile.launcher_country !== player?.country_code) {
         const fromCoords = COUNTRY_COORDS[missile.launcher_country]
         const toCoords = COUNTRY_COORDS[missile.target_country]
@@ -159,10 +164,7 @@ export default function Home() {
 
   useRealtimeMissiles({ onMissile, onNews, onCountryUpdate })
 
-  // ── Handle enter ──────────────────────────────────────────────────────────
-  const handleEnter = (p: Player) => {
-    setPlayer(p)
-  }
+  const handleEnter = (p: Player) => setPlayer(p)
 
   // ── Handle launch ─────────────────────────────────────────────────────────
   const handleLaunch = async () => {
@@ -174,13 +176,9 @@ export default function Home() {
     launchingRef.current = true
     setIsLaunching(true)
 
-    // Fly to player's country so they see the launch origin
     const fromCoords = COUNTRY_COORDS[player.country_code]
-    if (fromCoords) {
-      globeRef.current?.flyTo(fromCoords[0], fromCoords[1], 1200)
-    }
+    if (fromCoords) globeRef.current?.flyTo(fromCoords[0], fromCoords[1], 1200)
 
-    // Start API call immediately — concurrent with flyTo animation
     const apiPromise = fetch('/api/launch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -200,16 +198,13 @@ export default function Home() {
       error?: string
     }>).catch(() => null)
 
-    // Wait for flyTo to settle
     await new Promise<void>(resolve => setTimeout(resolve, 800))
 
     try {
       const data = await apiPromise
-
       if (data?.success && data.flight_seconds) {
         const toCoords = COUNTRY_COORDS[targetCountry]
         if (fromCoords && toCoords) {
-          // Sound + missile appear in the same frame
           if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
           else SoundEngine.playLaunch()
           globeRef.current?.launchMissile(
@@ -234,11 +229,13 @@ export default function Home() {
     }
   }
 
-  // ── Sorted damage rankings ────────────────────────────────────────────────
+  // ── Derived ───────────────────────────────────────────────────────────────
   const sortedCountries = Object.values(countries)
     .filter(c => c.damage_percent > 0)
     .sort((a, b) => b.damage_percent - a.damage_percent)
     .slice(0, 10)
+
+  const onlineCountries = Object.values(countries).filter(c => c.online_users > 0)
 
   const launchDisabled =
     isLaunching ||
@@ -249,39 +246,36 @@ export default function Home() {
   return (
     <div className="font-mono bg-[#0B0B0C]">
 
-      {/* ── Entry Modal ── */}
+      {/* Entry Modal */}
       {!player && <EntryModal onEnter={handleEnter} />}
 
-      {/* ── Intercept alert ── */}
+      {/* Intercept alert */}
       {interceptAlert && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 border border-[#FF2233] bg-[#FF2233]/10 neon-glow text-xs tracking-widest">
           {interceptAlert}
         </div>
       )}
 
-      {/* ── Nuke reward alert ── */}
+      {/* Nuke reward alert */}
       {nukeReward && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 border border-orange-500 bg-orange-500/10 text-orange-400 text-xs tracking-widest">
           ☢️ NUKE ACQUIRED +{nukeReward}
         </div>
       )}
 
-      {/* ══════════ Globe — full screen background ══════════ */}
-      <div
-        className="fixed inset-0 z-0"
-        style={{ width: '100vw', height: '100vh' }}
-      >
+      {/* Globe — full screen */}
+      <div className="fixed inset-0 z-0" style={{ width: '100vw', height: '100vh' }}>
         <Globe ref={globeRef} onImpact={() => { SoundEngine.init(); SoundEngine.playImpact() }} />
       </div>
 
-      {/* ══════════ Top bar ══════════ */}
+      {/* Top bar */}
       <header
         className="fixed top-0 left-0 right-0 z-20 h-10 flex items-center px-3 gap-4"
-        style={{ background: 'rgba(11,11,12,0.82)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(255,34,51,0.2)' }}
+        style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(255,34,51,0.15)' }}
       >
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
-          <span className="text-zinc-400 text-[10px]">// GLOBAL WARFARE SIM</span>
+          <span className="text-zinc-500 text-[10px]">// GLOBAL WARFARE SIM</span>
         </div>
         <div className="flex-1 flex items-center justify-center overflow-hidden">
           {news[0] ? (
@@ -303,14 +297,14 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ══════════ LEFT PANEL ══════════ */}
+      {/* ══ LEFT PANEL — pointer-events-none lets wheel events reach the globe ══ */}
       <aside
-        className="fixed left-0 top-0 h-screen w-72 z-10 overflow-y-auto pt-10 flex flex-col"
-        style={{ background: 'rgba(11,11,12,0.82)', backdropFilter: 'blur(8px)', borderRight: '1px solid rgba(255,34,51,0.2)' }}
+        className="fixed left-0 top-10 bottom-0 z-10 w-64 flex flex-col gap-2 p-2 overflow-y-auto pointer-events-none"
+        style={{ scrollbarWidth: 'none' }}
       >
 
-        {/* § 1 — OPERATOR */}
-        <div className="p-3 border-b border-zinc-800/60">
+        {/* OPERATOR */}
+        <div className="pointer-events-auto p-3" style={CARD}>
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">OPERATOR</div>
           {player ? (
             <>
@@ -322,17 +316,10 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex items-center gap-4 text-[10px]">
-                <span className="text-zinc-400">
-                  🚀 <span className="text-green-400 font-bold">{missiles}</span>
-                </span>
-                <span className="text-zinc-400">
-                  ☢️ <span className="text-orange-400 font-bold">{nukes}</span>
-                </span>
+                <span className="text-zinc-400">🚀 <span className="text-green-400 font-bold">{missiles}</span></span>
+                <span className="text-zinc-400">☢️ <span className="text-orange-400 font-bold">{nukes}</span></span>
                 <button
-                  onClick={() => {
-                    localStorage.removeItem('ghostwar_player')
-                    setPlayer(null)
-                  }}
+                  onClick={() => { localStorage.removeItem('ghostwar_player'); setPlayer(null) }}
                   className="ml-auto text-zinc-600 text-[10px] hover:text-zinc-400 transition-colors cursor-pointer"
                 >
                   [EXIT]
@@ -344,8 +331,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* § 2 — WEAPONS */}
-        <div className="p-3 border-b border-zinc-800/60">
+        {/* WEAPONS */}
+        <div className="pointer-events-auto p-3" style={CARD}>
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">WEAPONS</div>
           <div className="flex gap-2 mb-3">
             <button
@@ -387,8 +374,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* § 3 — TARGET */}
-        <div className="p-3 border-b border-zinc-800/60">
+        {/* TARGET */}
+        <div className="pointer-events-auto p-3" style={CARD}>
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">TARGET</div>
           <select
             value={targetCountry ?? ''}
@@ -397,9 +384,7 @@ export default function Home() {
           >
             <option value="">── SELECT TARGET ──</option>
             {COUNTRIES.filter(c => c.code !== player?.country_code).map(c => (
-              <option key={c.code} value={c.code}>
-                {c.flag} {c.name}
-              </option>
+              <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
             ))}
           </select>
           {targetCountry && (
@@ -435,8 +420,8 @@ export default function Home() {
           )}
         </div>
 
-        {/* § 4 — LAUNCH */}
-        <div className="p-3 border-b border-zinc-800/60">
+        {/* LAUNCH */}
+        <div className="pointer-events-auto p-3" style={CARD}>
           <button
             onClick={handleLaunch}
             disabled={launchDisabled}
@@ -446,8 +431,8 @@ export default function Home() {
           </button>
         </div>
 
-        {/* § 5 — DEFENSE */}
-        <div className="p-3 border-b border-zinc-800/60">
+        {/* DEFENSE */}
+        <div className="pointer-events-auto p-3" style={CARD}>
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
           <button
             disabled
@@ -463,27 +448,19 @@ export default function Home() {
           </div>
         </div>
 
-        {/* § 6 — ALLIANCES */}
-        <div className="p-3">
-          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">ALLIANCES</div>
-          <div className="text-zinc-600 text-[10px]">No active alliances</div>
-        </div>
       </aside>
 
-      {/* ══════════ RIGHT PANEL ══════════ */}
-      <aside
-        className="fixed right-0 top-0 h-screen w-72 z-10 overflow-y-auto pt-10 flex flex-col"
-        style={{ background: 'rgba(11,11,12,0.82)', backdropFilter: 'blur(8px)', borderLeft: '1px solid rgba(255,34,51,0.2)' }}
-      >
+      {/* ══ RIGHT PANEL ══ */}
+      <aside className="fixed right-0 top-10 bottom-0 z-10 w-64 flex flex-col gap-2 p-2 pointer-events-none">
 
-        {/* Breaking news */}
-        <div className="p-3 border-b border-zinc-800/60 flex-1 min-h-0">
-          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">BREAKING NEWS</div>
+        {/* LIVE STRIKES — 3-item real-time ticker */}
+        <div className="pointer-events-auto p-3" style={CARD}>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">LIVE STRIKES</div>
           {news.length === 0 ? (
             <div className="text-zinc-500 text-[10px]">Awaiting first strike...</div>
           ) : (
-            <div className="space-y-1.5 overflow-y-auto">
-              {news.map((item, i) => (
+            <div className="flex flex-col gap-1">
+              {news.slice(0, 3).map((item, i) => (
                 <button
                   key={item.id}
                   onClick={() => {
@@ -492,19 +469,40 @@ export default function Home() {
                     const coords = COUNTRY_COORDS[code]
                     if (coords) globeRef.current?.flyTo(coords[0], coords[1])
                   }}
-                  className={`w-full text-left text-sm leading-relaxed block cursor-pointer hover:opacity-80 transition-opacity p-2 border-l-2 border-[#FF2233] ${
-                    i === 0 ? 'bg-zinc-800/80 text-white' : 'bg-zinc-900/60 text-zinc-200'
+                  className={`w-full text-left cursor-pointer hover:opacity-80 transition-opacity border-l-2 pl-2 py-0.5 ${
+                    i === 0 ? 'border-[#FF2233]' : 'border-[#FF2233]/25'
                   }`}
                 >
-                  <TypewriterText text={item.content} instant={i !== 0} speed={18} />
+                  <p className={`text-[10px] leading-[1.35] ${i === 0 ? 'text-zinc-200' : 'text-zinc-500'}`}>
+                    <TypewriterText text={item.content} instant={i !== 0} speed={18} />
+                  </p>
                 </button>
               ))}
             </div>
           )}
         </div>
 
-        {/* Damage rankings */}
-        <div className="p-3">
+        {/* ONLINE NATIONS — scrolling flag strip */}
+        <div className="pointer-events-auto p-3" style={CARD}>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">ONLINE NATIONS</div>
+          {onlineCountries.length === 0 ? (
+            <div className="text-zinc-500 text-[10px]">No active operators</div>
+          ) : (
+            <div className="overflow-hidden h-7">
+              <div className="flags-scroll flex gap-2 w-max">
+                {[...onlineCountries, ...onlineCountries].map((c, i) => (
+                  <span key={i} title={c.name} className="text-xl leading-none">{c.flag}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* DAMAGE RANKINGS */}
+        <div
+          className="pointer-events-auto flex-1 p-3 overflow-y-auto"
+          style={{ ...CARD, scrollbarWidth: 'none' }}
+        >
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
           {sortedCountries.length === 0 ? (
             <div className="text-zinc-500 text-[10px]">No damage recorded</div>
@@ -531,6 +529,7 @@ export default function Home() {
             </div>
           )}
         </div>
+
       </aside>
     </div>
   )

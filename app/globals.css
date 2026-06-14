@@ -45,3 +45,11 @@ body {
 .neon-border-pulse {
   animation: neon-border-pulse 2s ease-in-out infinite;
 }
+
+@keyframes scroll-flags {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.flags-scroll {
+  animation: scroll-flags 22s linear infinite;
+}
