@@ -19,6 +19,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
   const [countryCode, setCountryCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,6 +68,26 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       // localStorage unavailable — continue anyway
     }
 
+    onEnter(player)
+  }
+
+  const handleRestoreSession = async () => {
+    const callsign = nickname.trim().toUpperCase()
+    if (!callsign) return
+    setRestoring(true)
+    const supabase = createClient()
+    const { data } = await supabase
+      .from('players')
+      .select('id, nickname, country_code')
+      .eq('nickname', callsign)
+      .single()
+    setRestoring(false)
+    if (!data) {
+      setError('SESSION NOT FOUND')
+      return
+    }
+    const player: Player = { id: data.id, nickname: data.nickname, country_code: data.country_code }
+    try { localStorage.setItem('ghostwar_player', JSON.stringify(player)) } catch { /* ignore */ }
     onEnter(player)
   }
 
@@ -148,6 +169,19 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
                   : 'text-[#FF2233] border-[#FF2233]/30'
               }`}>
                 ⚠ {error}
+              </div>
+            )}
+            {error === 'CALLSIGN TAKEN' && (
+              <div className="text-center text-zinc-500 text-[10px] tracking-wider leading-relaxed">
+                Already registered? This is your callsign if you&apos;ve played before.{' '}
+                <button
+                  type="button"
+                  onClick={handleRestoreSession}
+                  disabled={restoring}
+                  className="text-[#FF2233] hover:text-[#FF4444] tracking-widest transition-colors disabled:opacity-50"
+                >
+                  {restoring ? '[ RESTORING... ]' : '[ RESTORE SESSION ]'}
+                </button>
               </div>
             )}
 

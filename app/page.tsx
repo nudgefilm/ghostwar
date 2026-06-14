@@ -185,6 +185,11 @@ export default function Home() {
 
   const handleEnter = (p: Player) => setPlayer(p)
 
+  const handleLogout = () => {
+    try { localStorage.removeItem('ghostwar_player') } catch { /* ignore */ }
+    setPlayer(null)
+  }
+
   // ── Handle launch ─────────────────────────────────────────────────────────
   const handleLaunch = async () => {
     if (!player || !targetCountry || launchingRef.current) return
@@ -372,11 +377,15 @@ export default function Home() {
             {new Date().toISOString().slice(0, 10)} │ {onlineNations.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
           </span>
         </div>
-        <div className="shrink-0 text-zinc-300 text-[10px] tracking-wider">
+        <div className="shrink-0 text-[10px] tracking-wider">
           {player ? (
-            <span><TwemojiFlag code={player.country_code} size={14} className="mr-1" /> {player.nickname}</span>
+            <div className="group flex items-center gap-1.5 cursor-pointer" onClick={handleLogout}>
+              <TwemojiFlag code={player.country_code} size={14} />
+              <span className="text-zinc-300 group-hover:text-zinc-500 transition-colors">{player.nickname}</span>
+              <span className="text-[#FF2233] tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">[LOGOUT]</span>
+            </div>
           ) : (
-            'UNIDENTIFIED'
+            <span className="text-zinc-500">UNIDENTIFIED</span>
           )}
         </div>
       </header>
