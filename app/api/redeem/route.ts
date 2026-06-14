@@ -31,7 +31,9 @@ export async function POST(req: NextRequest) {
         body: params.toString(),
       })
       gumroadRes = await r.json() as typeof gumroadRes
-    } catch {
+      console.error(`[redeem] ${product.permalink}: HTTP ${r.status}`, JSON.stringify(gumroadRes))
+    } catch (err) {
+      console.error(`[redeem] ${product.permalink}: fetch error`, err)
       continue
     }
 
