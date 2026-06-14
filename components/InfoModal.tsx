@@ -12,7 +12,7 @@ export default function InfoModal({ title, children, onClose }: Props) {
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
 
       <div
-        className="relative w-80 font-mono text-xs flex flex-col"
+        className="relative w-full max-w-lg font-mono text-xs flex flex-col"
         style={{
           background: 'rgba(4,4,6,0.97)',
           border: '1px solid #FF2233',

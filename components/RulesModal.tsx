@@ -23,7 +23,7 @@ export default function RulesModal({ onClose }: Props) {
       <div className="absolute inset-0 bg-black/70" />
 
       <div
-        className="relative w-80 font-mono text-xs"
+        className="relative w-full max-w-lg font-mono text-xs"
         style={{
           background: 'rgba(4,4,6,0.97)',
           border: '1px solid #FF2233',
