@@ -512,13 +512,19 @@ export default function Home() {
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">ONLINE NATIONS</div>
           {onlineCountries.length === 0 ? (
             <div className="text-zinc-500 text-[10px]">No active operators</div>
-          ) : (
+          ) : onlineCountries.length > 5 ? (
             <div className="overflow-hidden h-7">
               <div className="flags-scroll flex gap-2 w-max">
                 {[...onlineCountries, ...onlineCountries].map((c, i) => (
                   <TwemojiFlag key={i} code={c.code} size={22} />
                 ))}
               </div>
+            </div>
+          ) : (
+            <div className="flex gap-2 h-7 items-center">
+              {onlineCountries.map(c => (
+                <TwemojiFlag key={c.code} code={c.code} size={22} />
+              ))}
             </div>
           )}
         </div>
