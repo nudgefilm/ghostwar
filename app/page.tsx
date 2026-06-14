@@ -78,6 +78,7 @@ export default function Home() {
   const [nukes, setNukes] = useState(0)
   const [news, setNews] = useState<NewsFeedRow[]>([])
   const [countries, setCountries] = useState<Record<string, CountryRow>>({})
+  const [onlineNations, setOnlineNations] = useState<string[]>([])
   const [isLaunching, setIsLaunching] = useState(false)
   const [interceptAlert, setInterceptAlert] = useState<string | null>(null)
   const [nukeReward, setNukeReward] = useState<number | null>(null)
@@ -86,13 +87,18 @@ export default function Home() {
   useEffect(() => {
     const loadCountries = async () => {
       const supabase = createClient()
-      const { data } = await supabase
-        .from('countries')
-        .select('code, name, flag, damage_percent, online_users')
-      if (data) {
+      const [{ data: countryData }, { data: playerData }] = await Promise.all([
+        supabase.from('countries').select('code, name, flag, damage_percent, online_users'),
+        supabase.from('players').select('country_code'),
+      ])
+      if (countryData) {
         const map: Record<string, CountryRow> = {}
-        data.forEach(c => { map[c.code] = c as CountryRow })
+        countryData.forEach(c => { map[c.code] = c as CountryRow })
         setCountries(map)
+      }
+      if (playerData) {
+        const codes = [...new Set(playerData.map(p => p.country_code as string))]
+        setOnlineNations(codes)
       }
     }
     loadCountries()
@@ -235,7 +241,9 @@ export default function Home() {
     .sort((a, b) => b.damage_percent - a.damage_percent)
     .slice(0, 10)
 
-  const onlineCountries = Object.values(countries).filter(c => c.online_users > 0)
+  const onlineCountries = onlineNations
+    .map(code => ({ code, flag: COUNTRY_FLAGS[code], name: COUNTRY_NAMES[code] }))
+    .filter(c => c.flag)
 
   const launchDisabled =
     isLaunching ||
@@ -500,8 +508,8 @@ export default function Home() {
 
         {/* DAMAGE RANKINGS */}
         <div
-          className="pointer-events-auto flex-1 p-3 overflow-y-auto"
-          style={{ ...CARD, scrollbarWidth: 'none' }}
+          className="pointer-events-auto p-3 overflow-y-auto"
+          style={{ ...CARD, scrollbarWidth: 'none', maxHeight: '260px' }}
         >
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
           {sortedCountries.length === 0 ? (

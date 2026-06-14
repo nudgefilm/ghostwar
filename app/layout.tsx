@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import FlagPolyfill from "@/components/FlagPolyfill";
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
@@ -20,6 +21,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${jetbrainsMono.variable} h-full`}>
       <body className="h-full font-[family-name:var(--font-jetbrains-mono)] antialiased">
+        <FlagPolyfill />
         {children}
       </body>
     </html>
