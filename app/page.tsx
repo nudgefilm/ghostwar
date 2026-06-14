@@ -154,6 +154,9 @@ export default function Home() {
   const [activeCount, setActiveCount] = useState(0)
   const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
   const [showRules, setShowRules] = useState(false)
+  const [redeemCode, setRedeemCode] = useState('')
+  const [redeemStatus, setRedeemStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isRedeeming, setIsRedeeming] = useState(false)
   const [infoModal, setInfoModal] = useState<'operator' | 'privacy' | 'terms' | null>(null)
   const [hofEntries, setHofEntries] = useState<{ nickname: string; country_code: string; action: string }[]>([])
   const [topTarget, setTopTarget] = useState<{ code: string; hits: number } | null>(null)
@@ -527,6 +530,41 @@ export default function Home() {
     })
     fetchAlliances()
   }, [fetchAlliances])
+
+  const handleRedeem = async () => {
+    if (!player || !redeemCode.trim() || isRedeeming) return
+    SoundEngine.init()
+    setIsRedeeming(true)
+    setRedeemStatus(null)
+    try {
+      const data = await fetch('/api/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player_id: player.id, code: redeemCode.trim() }),
+      }).then(r => r.json() as Promise<{ success: boolean; reward?: string; amount?: number; error?: string }>)
+
+      if (data.success) {
+        if (data.reward === 'missiles') {
+          setMissiles(prev => prev + (data.amount ?? 0))
+          setRedeemStatus({ type: 'success', message: `+${data.amount} MISSILES UNLOCKED` })
+        } else {
+          setNukes(prev => prev + (data.amount ?? 0))
+          setRedeemStatus({ type: 'success', message: `+${data.amount} NUKES UNLOCKED` })
+        }
+        SoundEngine.playRewardEarned()
+        setRedeemCode('')
+      } else {
+        const msg = data.error === 'CODE_ALREADY_USED' ? 'CODE ALREADY REDEEMED'
+          : data.error === 'INVALID_CODE' ? 'INVALID CODE'
+          : 'REDEMPTION FAILED'
+        setRedeemStatus({ type: 'error', message: msg })
+      }
+    } catch {
+      setRedeemStatus({ type: 'error', message: 'CONNECTION ERROR' })
+    } finally {
+      setIsRedeeming(false)
+    }
+  }
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -1375,6 +1413,48 @@ export default function Home() {
             <div className="text-[10px] font-mono text-zinc-400">
               ⏱ RESET IN {resetCountdown}
             </div>
+          </div>
+        </div>
+
+        {/* ARSENAL SUPPLY — redeem Gumroad codes */}
+        <div className="pointer-events-auto p-3" style={CARD}>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-2">ARSENAL SUPPLY</div>
+          <div className="flex gap-1 mb-1.5">
+            <input
+              type="text"
+              value={redeemCode}
+              onChange={e => { setRedeemCode(e.target.value.toUpperCase()); setRedeemStatus(null) }}
+              onKeyDown={e => e.key === 'Enter' && handleRedeem()}
+              placeholder="ENTER CODE..."
+              disabled={!player || isRedeeming}
+              className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1 font-mono tracking-wider placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-40"
+            />
+            <button
+              onClick={handleRedeem}
+              disabled={!player || !redeemCode.trim() || isRedeeming}
+              className="px-2 py-1 text-[10px] tracking-widest border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+            >
+              {isRedeeming ? '···' : 'REDEEM'}
+            </button>
+          </div>
+          {redeemStatus && (
+            <div
+              className="text-[9px] tracking-wider mb-1.5 font-mono"
+              style={{ color: redeemStatus.type === 'success' ? '#00FFAA' : '#FF2233' }}
+            >
+              {redeemStatus.type === 'success' ? '✓' : '✗'} {redeemStatus.message}
+            </div>
+          )}
+          <div className="flex gap-2 text-[9px]">
+            <a href="https://nudgefilm.gumroad.com/l/tbyskm" target="_blank" rel="noopener noreferrer"
+              className="text-zinc-600 hover:text-zinc-400 transition-colors">
+              Get Missiles ($5) ▸
+            </a>
+            <span className="text-zinc-700">│</span>
+            <a href="https://nudgefilm.gumroad.com/l/nneaar" target="_blank" rel="noopener noreferrer"
+              className="text-zinc-600 hover:text-zinc-400 transition-colors">
+              Get Nukes ($20) ▸
+            </a>
           </div>
         </div>
 
