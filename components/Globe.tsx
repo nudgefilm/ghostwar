@@ -388,18 +388,132 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       }
       requestAnimationFrame(animTrail)
 
-      // Camera shake 0.3s
+      // Camera shake: longer/stronger for nuke
       const cam = cameraRef.current
       if (cam) {
         const origPos = cam.position.clone()
-        const shakeEnd = Date.now() + 300
+        const shakeDur = m.type === 'nuke' ? 500 : 300
+        const shakeAmt = m.type === 'nuke' ? 0.15 : 0.08
+        const shakeEnd = Date.now() + shakeDur
         const shake = () => {
           if (Date.now() > shakeEnd) { cam.position.copy(origPos); return }
-          cam.position.x = origPos.x + (Math.random() - 0.5) * 0.08
-          cam.position.y = origPos.y + (Math.random() - 0.5) * 0.08
+          cam.position.x = origPos.x + (Math.random() - 0.5) * shakeAmt
+          cam.position.y = origPos.y + (Math.random() - 0.5) * shakeAmt
           requestAnimationFrame(shake)
         }
         shake()
+      }
+
+      // ── Mushroom cloud (nuke only) ──────────────────────────────────────
+      if (m.type === 'nuke') {
+        // impactNorm / tan / btan are already computed by the scorch mark section above
+
+        // Extra bright white flash: intensity 10, 0.15s
+        const nukeFlash = new THREE.PointLight(0xFFFFFF, 10, 2)
+        nukeFlash.position.copy(ip)
+        scene.add(nukeFlash)
+        const nukeFlashT0 = performance.now()
+        const animNukeFlash = () => {
+          const fp = Math.min((performance.now() - nukeFlashT0) / 150, 1)
+          nukeFlash.intensity = 10 * (1 - fp)
+          if (fp < 1) requestAnimationFrame(animNukeFlash)
+          else scene.remove(nukeFlash)
+        }
+        requestAnimationFrame(animNukeFlash)
+
+        // Stem: 15 particles rising along surface normal over 1s, staggered 40ms each
+        const stemGeo = new THREE.SphereGeometry(0.01, 4, 4)
+        type StemP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; delay: number; angle: number; spread: number; size: number; alive: boolean }
+        const stemList: StemP[] = []
+        const stemT0 = performance.now()
+        for (let s = 0; s < 15; s++) {
+          const size = 0.015 + Math.random() * 0.01
+          const mat = new THREE.MeshBasicMaterial({ color: 0xFFAA00, transparent: true, opacity: 0 })
+          const mesh = new THREE.Mesh(stemGeo, mat)
+          mesh.position.copy(ip)
+          mesh.scale.setScalar(size / 0.01)
+          scene.add(mesh)
+          stemList.push({ mesh, mat, delay: s * 40, angle: Math.random() * Math.PI * 2, spread: Math.random() * 0.015, size, alive: true })
+        }
+        const animStem = () => {
+          const now = performance.now()
+          let anyAlive = false
+          for (const p of stemList) {
+            if (!p.alive) continue
+            const elapsed = now - stemT0 - p.delay
+            if (elapsed < 0) { anyAlive = true; continue }
+            if (elapsed >= 3000) {
+              scene.remove(p.mesh); p.mat.dispose(); p.alive = false; continue
+            }
+            anyAlive = true
+            const riseP = Math.min(elapsed / 1000, 1)
+            p.mesh.position.copy(
+              ip.clone()
+                .add(impactNorm.clone().multiplyScalar(riseP * 0.15))
+                .add(tan.clone().multiplyScalar(Math.cos(p.angle) * p.spread * riseP))
+                .add(btan.clone().multiplyScalar(Math.sin(p.angle) * p.spread * riseP)),
+            )
+            p.mesh.scale.setScalar((p.size + riseP * 0.005) / 0.01)
+            if (elapsed < 300) {
+              p.mat.color.lerpColors(new THREE.Color(0xFFAA00), new THREE.Color(0xFF6600), elapsed / 300)
+              p.mat.opacity = elapsed / 300
+            } else if (elapsed < 1500) {
+              p.mat.color.lerpColors(new THREE.Color(0xFF6600), new THREE.Color(0x888888), (elapsed - 300) / 1200)
+              p.mat.opacity = 1
+            } else {
+              const fp = (elapsed - 1500) / 1500
+              p.mat.color.lerpColors(new THREE.Color(0x888888), new THREE.Color(0x444444), fp)
+              p.mat.opacity = 1 - fp
+            }
+          }
+          if (anyAlive) requestAnimationFrame(animStem)
+          else stemGeo.dispose()
+        }
+        requestAnimationFrame(animStem)
+
+        // Cap: 12 particles in a ring at stem top, spawned after 800ms
+        setTimeout(() => {
+          const capGeo = new THREE.SphereGeometry(0.01, 4, 4)
+          type CapP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; angle: number }
+          const capList: CapP[] = []
+          const capT0 = performance.now()
+          const stemTop = ip.clone().add(impactNorm.clone().multiplyScalar(0.15))
+          for (let c = 0; c < 12; c++) {
+            const size = 0.03 + Math.random() * 0.02
+            const mat = new THREE.MeshBasicMaterial({ color: 0xCCCCCC, transparent: true, opacity: 0 })
+            const mesh = new THREE.Mesh(capGeo, mat)
+            mesh.position.copy(stemTop)
+            mesh.scale.setScalar(size / 0.01)
+            scene.add(mesh)
+            capList.push({ mesh, mat, angle: (c / 12) * Math.PI * 2 })
+          }
+          const animCap = () => {
+            const elapsed = performance.now() - capT0
+            if (elapsed >= 2000) {
+              for (const p of capList) { scene.remove(p.mesh); p.mat.dispose() }
+              capGeo.dispose()
+              return
+            }
+            for (const p of capList) {
+              const radius = Math.min(elapsed / 800, 1) * 0.08
+              p.mesh.position.copy(
+                stemTop.clone()
+                  .add(tan.clone().multiplyScalar(Math.cos(p.angle) * radius))
+                  .add(btan.clone().multiplyScalar(Math.sin(p.angle) * radius)),
+              )
+              if (elapsed < 800) {
+                p.mat.color.lerpColors(new THREE.Color(0xCCCCCC), new THREE.Color(0x888888), elapsed / 800)
+                p.mat.opacity = Math.min(elapsed / 200, 1)
+              } else {
+                const fp = (elapsed - 800) / 1200
+                p.mat.color.set(0x888888)
+                p.mat.opacity = 1 - fp
+              }
+            }
+            requestAnimationFrame(animCap)
+          }
+          requestAnimationFrame(animCap)
+        }, 800)
       }
     }
 
