@@ -11,6 +11,7 @@ import { useRealtimeMissiles, type NewsFeedRow, type CountryRow } from '@/hooks/
 import { createClient } from '@/lib/supabase/client'
 import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/countries'
 import { SoundEngine } from '@/lib/sounds'
+import EventTicker, { useEventTicker } from '@/components/EventTicker'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Globe = dynamic(() => import('@/components/Globe'), { ssr: false }) as any
@@ -104,6 +105,9 @@ export default function Home() {
   const [showRules, setShowRules] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const { queue: tickerQueue, pushEvent, shift: shiftTicker } = useEventTicker()
+  const pushEventRef = useRef(pushEvent)
+  pushEventRef.current = pushEvent
 
   // ── Defense system state ──────────────────────────────────────────────────
   const [incomingThreats, setIncomingThreats] = useState<IncomingThreat[]>([])
@@ -297,6 +301,10 @@ export default function Home() {
           SoundEngine.playIntercept()
           setInterceptNotif('🛡️ INTERCEPTED!')
           setTimeout(() => setInterceptNotif(null), 2000)
+          pushEventRef.current(
+            `🛡 INTERCEPT SUCCESSFUL — ${threat.quantity} ${threat.type}(s) destroyed`,
+            'defense',
+          )
 
           if (player) {
             fetch('/api/intercept', {
@@ -415,6 +423,7 @@ export default function Home() {
           setNukes(prev => prev + data.nukes_earned!)
           setNukeReward(data.nukes_earned!)
           setTimeout(() => setNukeReward(null), 4000)
+          pushEvent(`☢ NUKE EARNED — +${data.nukes_earned}`, 'reward')
         }
       }
     } finally {
@@ -477,6 +486,9 @@ export default function Home() {
         </div>
       )}
 
+      {/* Event ticker — centered below top bar, above globe */}
+      <EventTicker queue={tickerQueue} onShift={shiftTicker} />
+
       {/* Globe — full screen */}
       <div className="fixed inset-0 z-0" style={{ width: '100vw', height: '100vh' }}>
         <Globe ref={globeRef} onImpact={(data: ImpactData) => {
@@ -507,6 +519,13 @@ export default function Home() {
               old_rank: number | null; new_rank: number | null
             }) => {
               if (!result.success) return
+
+              // Scorched Earth ticker — fires for any country reaching 100% (player involvement not required)
+              if (!result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100) {
+                const scorchedName = COUNTRY_NAMES[data.targetCountry as string] ?? data.targetCountry
+                pushEvent(`☠ ${scorchedName} SCORCHED — attacks reduced 50%`, 'combat')
+              }
+
               const isAttacker = player && result.launcher_id === player.id
               const isVictim = data.targetCountry === player?.country_code && result.launcher_id !== player?.id
               if (!isAttacker && !isVictim) return
