@@ -75,12 +75,16 @@ export async function POST(req: NextRequest) {
     return sum + (m.quantity as number) * weight
   }, 0) ?? 0
 
-  const new_damage_percent = Math.min(100, Math.floor(totalDamage / 1000) * 10)
+  const new_damage_percent = Math.min(100, Math.floor(totalDamage / 10))
 
-  await supabase
+  const { error: countryUpdateError } = await supabase
     .from('countries')
     .update({ damage_percent: new_damage_percent })
     .eq('code', target_country as string)
+
+  if (countryUpdateError) {
+    console.error('[impact] countries update failed:', countryUpdateError)
+  }
 
   // Update total_kills and calculate rank (gracefully skip if column missing)
   let old_rank: number | null = null
