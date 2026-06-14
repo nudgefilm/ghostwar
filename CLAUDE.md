@@ -1,5 +1,33 @@
 @AGENTS.md
 
+## 🔒 LOCKED FEATURES — DO NOT MODIFY
+
+These are intentional behaviors that have been broken by accidental overwrites
+before. Before committing ANY change to the files below, read this section and
+verify none of these are broken. Ask the user before changing them.
+
+### LIVE STRIKES panel (`app/page.tsx`)
+- MUST show exactly 5 most recent **unique target countries** (not raw news items)
+- When a country is attacked again, its entry moves to the top (no duplicates)
+- State: `recentStrikes: NewsFeedRow[]` — maintained in `onNews` via dedup filter
+- MUST fade opacity per position: `[1, 0.75, 0.5, 0.3, 0.15]`
+- Do NOT change to `slice(0, N)` on a raw news array — that allows duplicate countries
+
+### BattleReportModal auto-dismiss (`components/BattleReportModal.tsx`)
+- MUST auto-close after 3 000 ms via `useEffect`
+- `useEffect` dependency array MUST be `[]` (empty)
+- Do NOT add `onClose` or any other prop to the deps — `onClose` is an inline arrow
+  in the parent; adding it causes the timer to reset on every Supabase realtime
+  re-render, so it never fires
+- X close icon and RETALIATE button must coexist with the auto-dismiss
+
+### DAMAGE RANKINGS (`app/page.tsx` + `app/api/recover/route.ts`)
+- Filter MUST be: `(c.damage_percent ?? 0) > 0`
+- Recovery callback fields MUST use `row.damage_stack` / `row.damage_percent`
+  (NOT `row.new_stack` / `row.new_percent` — those are the wrong field names)
+
+---
+
 ## 절대 변경 금지 사항
 
 ### 구현 완료된 기능 보호 — 핵심 규칙

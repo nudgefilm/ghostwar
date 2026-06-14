@@ -94,7 +94,7 @@ export default function Home() {
   const [quantity, setQuantity] = useState(1)
   const [missiles, setMissiles] = useState(100)
   const [nukes, setNukes] = useState(0)
-  const [news, setNews] = useState<NewsFeedRow[]>([])
+  const [recentStrikes, setRecentStrikes] = useState<NewsFeedRow[]>([])
   const [countries, setCountries] = useState<Record<string, CountryRow>>({})
   const [onlineNations, setOnlineNations] = useState<string[]>([])
   const [isLaunching, setIsLaunching] = useState(false)
@@ -231,7 +231,8 @@ export default function Home() {
   )
 
   const onNews = useCallback((item: NewsFeedRow) => {
-    setNews(prev => [item, ...prev].slice(0, 20))
+    // Dedup by target_country: remove existing entry for this country, prepend new one, cap at 5
+    setRecentStrikes(prev => [item, ...prev.filter(n => n.target_country !== item.target_country)].slice(0, 5))
     setStrikeCount(prev => prev + 1)
     if (item.content?.includes('nuclear')) setNukeCount(prev => prev + 1)
   }, [])
@@ -865,11 +866,11 @@ export default function Home() {
         {/* LIVE STRIKES — 5-item real-time ticker, older items fade */}
         <div className="pointer-events-auto p-3" style={CARD}>
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">LIVE STRIKES</div>
-          {news.length === 0 ? (
+          {recentStrikes.length === 0 ? (
             <div className="text-zinc-500 text-[10px]">Awaiting first strike...</div>
           ) : (
             <div className="flex flex-col gap-1">
-              {news.slice(0, 5).map((item, i) => {
+              {recentStrikes.map((item, i) => {
                 const opacity = [1, 0.75, 0.5, 0.3, 0.15][i]
                 return (
                   <button
