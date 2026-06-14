@@ -96,7 +96,7 @@ export default function Home() {
   const [nukes, setNukes] = useState(0)
   const [recentStrikes, setRecentStrikes] = useState<NewsFeedRow[]>([])
   const [countries, setCountries] = useState<Record<string, CountryRow>>({})
-  const [damagedCountries, setDamagedCountries] = useState<{ code: string; name: string; flag: string; damage_percent: number }[]>([])
+  const [damagedRankings, setDamagedRankings] = useState<{ code: string; name: string; flag: string; damage_percent: number }[]>([])
   const [onlineNations, setOnlineNations] = useState<string[]>([])
   const [isLaunching, setIsLaunching] = useState(false)
   const [interceptAlert, setInterceptAlert] = useState<string | null>(null)
@@ -129,18 +129,6 @@ export default function Home() {
   })
   defenseStateRef.current = { player, nukes, defenseReadiness, nukeInterceptArmed, incomingThreats }
 
-  const fetchTop5Damaged = useCallback(() => {
-    createClient()
-      .from('countries')
-      .select('code, name, flag, damage_percent')
-      .gt('damage_percent', 0)
-      .order('damage_percent', { ascending: false })
-      .limit(5)
-      .then(({ data }) => {
-        if (data) setDamagedCountries(data as { code: string; name: string; flag: string; damage_percent: number }[])
-      })
-  }, [])
-
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
     const loadCountries = async () => {
@@ -156,7 +144,6 @@ export default function Home() {
         countryData.forEach(c => { map[c.code] = c as CountryRow })
         setCountries(map)
       }
-      fetchTop5Damaged()
       if (playerData) {
         const codes = [...new Set(playerData.map(p => p.country_code as string))]
         setOnlineNations(codes)
@@ -164,7 +151,7 @@ export default function Home() {
       if (todayStrikes != null) setStrikeCount(todayStrikes)
     }
     loadCountries()
-  }, [fetchTop5Damaged])
+  }, [])
 
   // ── Restore session from localStorage ────────────────────────────────────
   useEffect(() => {
@@ -270,13 +257,12 @@ export default function Home() {
               return { ...prev, [row.code]: { ...existing, damage_stack: row.damage_stack, damage_percent: row.damage_percent } }
             })
           })
-          fetchTop5Damaged()
         })
         .catch(() => {})
     }
     const id = setInterval(tick, 60_000)
     return () => clearInterval(id)
-  }, [fetchTop5Damaged])
+  }, [])
 
   // ── Defense countdown + interception resolution ────────────────────────────
   useEffect(() => {
@@ -538,7 +524,16 @@ export default function Home() {
               old_rank: number | null; new_rank: number | null
             }) => {
               if (!result.success) return
-              fetchTop5Damaged()
+
+              // Update DAMAGE RANKINGS from API response — no DB re-fetch, mirrors LIVE STRIKES pattern
+              const targetCode = data.targetCountry as string
+              const rankEntry = {
+                code: targetCode,
+                name: COUNTRY_NAMES[targetCode] ?? targetCode,
+                flag: COUNTRY_FLAGS[targetCode] ?? '',
+                damage_percent: result.new_damage_percent,
+              }
+              setDamagedRankings(prev => [rankEntry, ...prev.filter(e => e.code !== targetCode)].slice(0, 5))
 
               // Scorched Earth ticker — fires for any country reaching 100% (player involvement not required)
               if (!result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100) {
@@ -933,11 +928,11 @@ export default function Home() {
           style={CARD}
         >
           <div className="text-zinc-500 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
-          {damagedCountries.length === 0 ? (
+          {damagedRankings.length === 0 ? (
             <div className="text-zinc-500 text-[10px]">No damage recorded</div>
           ) : (
             <div className="space-y-2">
-              {damagedCountries.map((c, i) => (
+              {damagedRankings.map((c, i) => (
                 <button
                   key={c.code}
                   onClick={() => {
