@@ -44,9 +44,9 @@ export function useRealtimeMissiles({
   onNews,
   onCountryUpdate,
 }: UseRealtimeMissilesParams) {
-  const missileQueue = useRef<MissileRow[]>([])
-  const flushTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const callbacksRef = useRef({ onMissile, onNews, onCountryUpdate })
+  const lastPollTimeRef = useRef<string>(new Date().toISOString())
+  const countryTickRef = useRef(0)
 
   useEffect(() => {
     callbacksRef.current = { onMissile, onNews, onCountryUpdate }
@@ -55,47 +55,41 @@ export function useRealtimeMissiles({
   useEffect(() => {
     const supabase = createClient()
 
-    const startFlush = () => {
-      if (flushTimerRef.current) return
-      flushTimerRef.current = setInterval(() => {
-        const batch = missileQueue.current.splice(0)
-        batch.forEach(m => callbacksRef.current.onMissile(m))
-        if (missileQueue.current.length === 0 && flushTimerRef.current) {
-          clearInterval(flushTimerRef.current)
-          flushTimerRef.current = null
-        }
-      }, 500)
+    const poll = async () => {
+      const since = lastPollTimeRef.current
+      const now = new Date().toISOString()
+
+      const [{ data: newMissiles }, { data: newNews }] = await Promise.all([
+        supabase
+          .from('missiles')
+          .select('*')
+          .gt('launched_at', since)
+          .order('launched_at', { ascending: true }),
+        supabase
+          .from('news_feed')
+          .select('*')
+          .gt('created_at', since)
+          .order('created_at', { ascending: true }),
+      ])
+
+      lastPollTimeRef.current = now
+
+      newMissiles?.forEach(m => callbacksRef.current.onMissile(m as MissileRow))
+      newNews?.forEach(n => callbacksRef.current.onNews(n as NewsFeedRow))
+
+      countryTickRef.current += 1
+      if (countryTickRef.current >= 5) {
+        countryTickRef.current = 0
+        const { data: countries } = await supabase
+          .from('countries')
+          .select('*')
+          .order('damage_percent', { ascending: false })
+        countries?.forEach(c => callbacksRef.current.onCountryUpdate(c as CountryRow))
+      }
     }
 
-    const channel = supabase
-      .channel('ghostwar-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'missiles', filter: 'status=eq.flying' },
-        payload => {
-          missileQueue.current.push(payload.new as MissileRow)
-          startFlush()
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'news_feed' },
-        payload => {
-          callbacksRef.current.onNews(payload.new as NewsFeedRow)
-        },
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'countries' },
-        payload => {
-          callbacksRef.current.onCountryUpdate(payload.new as CountryRow)
-        },
-      )
-      .subscribe()
+    const interval = setInterval(poll, 1000)
 
-    return () => {
-      if (flushTimerRef.current) clearInterval(flushTimerRef.current)
-      supabase.removeChannel(channel)
-    }
+    return () => clearInterval(interval)
   }, [])
 }
