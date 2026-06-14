@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const PRODUCTS = [
-  { permalink: 'tbyskm', reward: 'missiles', amount: 100, field: 'missiles_remaining' },
-  { permalink: 'nneaar', reward: 'nukes',    amount: 2,   field: 'nukes_remaining'   },
+  { product_id: 'MUFaBaVZasH2sje5qU-OAQ==', permalink: 'tbyskm', reward: 'missiles', amount: 100, field: 'missiles_remaining' },
+  { product_id: 'V2kdAYosv6oKhuGfOVZgww==', permalink: 'nneaar', reward: 'nukes',    amount: 2,   field: 'nukes_remaining'   },
 ] as const
 
 export async function POST(req: NextRequest) {
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   for (const product of PRODUCTS) {
     const params = new URLSearchParams({
-      product_permalink: product.permalink,
+      product_id: product.product_id,
       license_key: String(code),
       increment_uses_count: 'true',
     })
