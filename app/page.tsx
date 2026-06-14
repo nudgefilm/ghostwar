@@ -94,9 +94,11 @@ export default function Home() {
   useEffect(() => {
     const loadCountries = async () => {
       const supabase = createClient()
-      const [{ data: countryData }, { data: playerData }] = await Promise.all([
+      const todayUTC = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z'
+      const [{ data: countryData }, { data: playerData }, { count: todayStrikes }] = await Promise.all([
         supabase.from('countries').select('code, name, flag, damage_percent, online_users'),
         supabase.from('players').select('country_code'),
+        supabase.from('missiles').select('*', { count: 'exact', head: true }).gte('launched_at', todayUTC),
       ])
       if (countryData) {
         const map: Record<string, CountryRow> = {}
@@ -107,6 +109,7 @@ export default function Home() {
         const codes = [...new Set(playerData.map(p => p.country_code as string))]
         setOnlineNations(codes)
       }
+      if (todayStrikes != null) setStrikeCount(todayStrikes)
     }
     loadCountries()
   }, [])

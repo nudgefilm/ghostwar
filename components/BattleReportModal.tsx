@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+
 export interface BattleReportData {
   role: 'attacker' | 'victim'
   targetCountry: string
@@ -21,6 +23,11 @@ interface Props {
 }
 
 export default function BattleReportModal({ report, onClose, onRetaliate }: Props) {
+  useEffect(() => {
+    const t = setTimeout(onClose, 3000)
+    return () => clearTimeout(t)
+  }, [onClose])
+
   const rankDiff = report.oldRank != null && report.newRank != null
     ? report.oldRank - report.newRank
     : null
@@ -60,6 +67,14 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
           }}
         />
 
+        {/* ✕ close icon */}
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 z-10 text-sm text-zinc-500 hover:text-[#FF2233] transition-colors leading-none"
+        >
+          ✕
+        </button>
+
         <div className="relative p-5">
           {/* Header */}
           <div className="text-center mb-4">
@@ -85,25 +100,17 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
             ))}
           </div>
 
-          <div className="text-zinc-700 text-[9px] tracking-widest mb-4">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
-
-          {/* Buttons */}
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="flex-1 py-2 text-[10px] tracking-widest text-zinc-400 border border-zinc-700 hover:border-zinc-500 hover:text-zinc-200 transition-colors"
-            >
-              CLOSE
-            </button>
-            {report.role === 'victim' && (
+          {report.role === 'victim' && (
+            <>
+              <div className="text-zinc-700 text-[9px] tracking-widest mb-4">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
               <button
                 onClick={() => onRetaliate(report.launcherCountry)}
-                className="flex-1 py-2 text-[10px] tracking-widest border border-[#FF2233]/60 hover:border-[#FF2233] hover:bg-[#FF2233]/10 transition-colors neon-glow"
+                className="w-full py-2 text-[10px] tracking-widest border border-[#FF2233]/60 hover:border-[#FF2233] hover:bg-[#FF2233]/10 transition-colors neon-glow"
               >
                 RETALIATE NOW →
               </button>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>
