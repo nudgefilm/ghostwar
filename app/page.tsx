@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { GlobeHandle } from '@/components/Globe'
+import type { GlobeHandle, ImpactData } from '@/components/Globe'
 import EntryModal, { type Player } from '@/components/EntryModal'
 import TwemojiFlag from '@/components/TwemojiFlag'
 import { useRealtimeMissiles, type NewsFeedRow, type CountryRow } from '@/hooks/useRealtimeMissiles'
@@ -154,6 +154,8 @@ export default function Home() {
             missile.quantity,
             missile.type as 'missile' | 'nuke',
             remainingMs,
+            missile.id,
+            missile.target_country,
           )
         }
       }
@@ -220,6 +222,8 @@ export default function Home() {
             quantity,
             weaponType,
             data.flight_seconds * 1000,
+            data.missile_id,
+            targetCountry ?? undefined,
           )
         }
         if (weaponType === 'missile') setMissiles(prev => prev - quantity)
@@ -274,7 +278,17 @@ export default function Home() {
 
       {/* Globe — full screen */}
       <div className="fixed inset-0 z-0" style={{ width: '100vw', height: '100vh' }}>
-        <Globe ref={globeRef} onImpact={() => { SoundEngine.init(); SoundEngine.playImpact() }} />
+        <Globe ref={globeRef} onImpact={(data: ImpactData) => {
+          SoundEngine.init()
+          SoundEngine.playImpact()
+          if (data.missileId && data.targetCountry) {
+            fetch('/api/impact', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ missile_id: data.missileId, target_country: data.targetCountry }),
+            }).catch(() => {})
+          }
+        }} />
       </div>
 
       {/* Top bar */}

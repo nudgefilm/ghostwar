@@ -55,6 +55,8 @@ interface MissileState {
   trailPositions: Float32Array
   trailColors: Float32Array
   impactPoint: THREE.Vector3
+  missileId?: string
+  targetCountry?: string
 }
 
 export interface GlobeHandle {
@@ -67,6 +69,8 @@ export interface GlobeHandle {
     quantity: number,
     type: 'missile' | 'nuke',
     duration?: number,
+    missileId?: string,
+    targetCountry?: string,
   ) => void
 }
 
@@ -81,8 +85,14 @@ interface GeoFeature {
   geometry: GeoGeometry
 }
 
+export interface ImpactData {
+  missileId?: string
+  targetCountry?: string
+  type: 'missile' | 'nuke'
+}
+
 interface GlobeProps {
-  onImpact?: () => void
+  onImpact?: (data: ImpactData) => void
 }
 
 const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
@@ -252,7 +262,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
     const triggerExplosion = (m: MissileState) => {
       const ip = m.impactPoint
-      onImpactRef.current?.()
+      onImpactRef.current?.({ missileId: m.missileId, targetCountry: m.targetCountry, type: m.type })
 
       // Flash: intensity 5, 0.25s
       const flashLight = new THREE.PointLight(0xFF4400, 5, 1.5)
@@ -694,7 +704,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       requestAnimationFrame(tick)
     },
 
-    launchMissile(fromLat, fromLng, toLat, toLng, quantity, type, duration = 5000) {
+    launchMissile(fromLat, fromLng, toLat, toLng, quantity, type, duration = 5000, missileId?: string, targetCountry?: string) {
       const scene = sceneRef.current
       if (!scene) return
 
@@ -747,6 +757,8 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             trailPositions,
             trailColors,
             impactPoint,
+            missileId,
+            targetCountry,
           })
         }, i * 200)
       }
