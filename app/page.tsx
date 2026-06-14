@@ -84,6 +84,8 @@ export default function Home() {
   const launchingRef = useRef(false)
   const processedMissileIdsRef = useRef<Set<string>>(new Set())
   const interceptedMissilesRef = useRef<Set<string>>(new Set())
+  const impactSoundCountRef = useRef(0)
+  const impactSoundResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const threatResolvedRef = useRef<Set<string>>(new Set())
 
   const [player, setPlayer] = useState<Player | null>(null)
@@ -498,11 +500,17 @@ export default function Home() {
           if (!data.missileId || !data.targetCountry) return
           // Skip missiles that were intercepted (Globe already showed blue explosion)
           if (interceptedMissilesRef.current.has(data.missileId)) return
-          // Deduplicate: only process once per missile_id across quantity > 1 animations
+
+          // Play impact sound for each animation, capped at 5 per salvo so large
+          // volleys don't spam. Reset counter 800ms after the last impact in the batch.
+          impactSoundCountRef.current++
+          if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
+          impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
+          if (impactSoundCountRef.current <= 5) SoundEngine.playImpact()
+
+          // Deduplicate API call: only process once per missile_id across quantity > 1 animations
           if (processedMissileIdsRef.current.has(data.missileId)) return
           processedMissileIdsRef.current.add(data.missileId)
-
-          SoundEngine.playImpact()
 
           fetch('/api/impact', {
             method: 'POST',

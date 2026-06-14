@@ -96,12 +96,16 @@ export const SoundEngine = {
   playImpact() {
     const ctx = this.ctx
     if (!ctx) return
+    // Slight pitch variation (±12%) prevents identical simultaneous sounds from
+    // cancelling each other out when a multi-missile salvo lands at the same time.
+    const rate = 0.88 + Math.random() * 0.24
     if (this._buffers['impact']) {
-      this._playBuffer('impact', 1.0)
+      this._playBuffer('impact', 1.0, rate)
       return
     }
-    // Fallback: synthesized
+    // Fallback: synthesized — vary boom base freq for same reason
     const t = ctx.currentTime
+    const boomFreq = 70 + Math.random() * 30  // 70–100 Hz
     const crackSize = Math.floor(ctx.sampleRate * 0.05)
     const crackBuf = ctx.createBuffer(1, crackSize, ctx.sampleRate)
     const crackData = crackBuf.getChannelData(0)
@@ -117,7 +121,7 @@ export const SoundEngine = {
     const boom = ctx.createOscillator()
     const boomGain = ctx.createGain()
     boom.type = 'sine'
-    boom.frequency.setValueAtTime(85, t)
+    boom.frequency.setValueAtTime(boomFreq, t)
     boom.frequency.exponentialRampToValueAtTime(18, t + 2.5)
     boomGain.gain.setValueAtTime(1.6, t)
     boomGain.gain.exponentialRampToValueAtTime(0.001, t + 2.5)
