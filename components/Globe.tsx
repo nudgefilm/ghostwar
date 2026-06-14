@@ -408,6 +408,19 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       if (m.type === 'nuke') {
         // impactNorm / tan / btan are already computed by the scorch mark section above
 
+        // Radial gradient texture — soft circular puff, shared by all particles this explosion
+        const smokeCanvas = document.createElement('canvas')
+        smokeCanvas.width = 64; smokeCanvas.height = 64
+        const smokeCtx = smokeCanvas.getContext('2d')!
+        const grad = smokeCtx.createRadialGradient(32, 32, 0, 32, 32, 32)
+        grad.addColorStop(0,   'rgba(255,255,255,1)')
+        grad.addColorStop(0.4, 'rgba(255,255,255,0.6)')
+        grad.addColorStop(1,   'rgba(255,255,255,0)')
+        smokeCtx.fillStyle = grad
+        smokeCtx.fillRect(0, 0, 64, 64)
+        const smokeTexture = new THREE.CanvasTexture(smokeCanvas)
+        setTimeout(() => smokeTexture.dispose(), 7000)
+
         // Extra bright white flash: intensity 10, 0.15s
         const nukeFlash = new THREE.PointLight(0xFFFFFF, 10, 2)
         nukeFlash.position.copy(ip)
@@ -421,19 +434,25 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         }
         requestAnimationFrame(animNukeFlash)
 
-        // Stem: 35 particles rising along surface normal over 2s, staggered 35ms each
-        const stemGeo = new THREE.SphereGeometry(0.01, 5, 5)
-        type StemP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; delay: number; angle: number; spread: number; size: number; alive: boolean }
+        // Stem: 35 Sprite particles rising along surface normal over 2s, staggered 35ms each
+        type StemP = { sprite: THREE.Sprite; mat: THREE.SpriteMaterial; delay: number; angle: number; spread: number; size: number; alive: boolean }
         const stemList: StemP[] = []
         const stemT0 = performance.now()
         for (let s = 0; s < 35; s++) {
           const size = 0.018 + Math.random() * 0.014
-          const mat = new THREE.MeshBasicMaterial({ color: 0xFFAA00, transparent: true, opacity: 0 })
-          const mesh = new THREE.Mesh(stemGeo, mat)
-          mesh.position.copy(ip)
-          mesh.scale.setScalar(size / 0.01)
-          scene.add(mesh)
-          stemList.push({ mesh, mat, delay: s * 35, angle: Math.random() * Math.PI * 2, spread: Math.random() * 0.04, size, alive: true })
+          const mat = new THREE.SpriteMaterial({
+            map: smokeTexture,
+            color: 0xFFAA00,
+            transparent: true,
+            opacity: 0,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          })
+          const sprite = new THREE.Sprite(mat)
+          sprite.scale.set(size * 5, size * 5, 1)
+          sprite.position.copy(ip)
+          scene.add(sprite)
+          stemList.push({ sprite, mat, delay: s * 35, angle: Math.random() * Math.PI * 2, spread: Math.random() * 0.04, size, alive: true })
         }
         const animStem = () => {
           const now = performance.now()
@@ -443,21 +462,24 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             const elapsed = now - stemT0 - p.delay
             if (elapsed < 0) { anyAlive = true; continue }
             if (elapsed >= 6000) {
-              scene.remove(p.mesh); p.mat.dispose(); p.alive = false; continue
+              scene.remove(p.sprite); p.mat.dispose(); p.alive = false; continue
             }
             anyAlive = true
             const riseP = Math.min(elapsed / 2000, 1)
-            p.mesh.position.copy(
+            const sz = (p.size + riseP * 0.008) * 5
+            p.sprite.position.copy(
               ip.clone()
                 .add(impactNorm.clone().multiplyScalar(riseP * 0.15))
                 .add(tan.clone().multiplyScalar(Math.cos(p.angle) * p.spread * riseP))
                 .add(btan.clone().multiplyScalar(Math.sin(p.angle) * p.spread * riseP)),
             )
-            p.mesh.scale.setScalar((p.size + riseP * 0.008) / 0.01)
+            p.sprite.scale.set(sz, sz, 1)
             if (elapsed < 500) {
+              if (p.mat.blending !== THREE.AdditiveBlending) { p.mat.blending = THREE.AdditiveBlending; p.mat.needsUpdate = true }
               p.mat.color.lerpColors(new THREE.Color(0xFFAA00), new THREE.Color(0xFF6600), elapsed / 500)
               p.mat.opacity = elapsed / 500
             } else if (elapsed < 3500) {
+              if (p.mat.blending !== THREE.NormalBlending) { p.mat.blending = THREE.NormalBlending; p.mat.needsUpdate = true }
               p.mat.color.lerpColors(new THREE.Color(0xFF6600), new THREE.Color(0x888888), (elapsed - 500) / 3000)
               p.mat.opacity = 1
             } else {
@@ -467,15 +489,12 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             }
           }
           if (anyAlive) requestAnimationFrame(animStem)
-          else stemGeo.dispose()
         }
         requestAnimationFrame(animStem)
 
-        // Cap: 2 rings × 16 particles, spawned after 1600ms
-        // Outer ring spreads to r=0.12 at stemTop; inner ring to r=0.07 slightly higher — gives toroidal shape
+        // Cap: 2 rings × 16 Sprite particles, spawned after 1600ms
         setTimeout(() => {
-          const capGeo = new THREE.SphereGeometry(0.01, 5, 5)
-          type CapP = { mesh: THREE.Mesh; mat: THREE.MeshBasicMaterial; angle: number; maxRadius: number; heightOff: number }
+          type CapP = { sprite: THREE.Sprite; mat: THREE.SpriteMaterial; angle: number; maxRadius: number; heightOff: number }
           const capList: CapP[] = []
           const capT0 = performance.now()
           const stemTop = ip.clone().add(impactNorm.clone().multiplyScalar(0.15))
@@ -485,24 +504,31 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
             const maxRadius = isInner ? 0.07 : 0.12
             const heightOff = isInner ? 0.04 : 0
             const size = isInner ? (0.035 + Math.random() * 0.025) : (0.04 + Math.random() * 0.03)
-            const mat = new THREE.MeshBasicMaterial({ color: 0xDDDDDD, transparent: true, opacity: 0 })
-            const mesh = new THREE.Mesh(capGeo, mat)
-            mesh.position.copy(stemTop.clone().add(impactNorm.clone().multiplyScalar(heightOff)))
-            mesh.scale.setScalar(size / 0.01)
-            scene.add(mesh)
-            capList.push({ mesh, mat, angle, maxRadius, heightOff })
+            const mat = new THREE.SpriteMaterial({
+              map: smokeTexture,
+              color: 0xDDDDDD,
+              transparent: true,
+              opacity: 0,
+              depthWrite: false,
+              blending: THREE.NormalBlending,
+            })
+            const sprite = new THREE.Sprite(mat)
+            const sz = size * 4
+            sprite.scale.set(sz, sz, 1)
+            sprite.position.copy(stemTop.clone().add(impactNorm.clone().multiplyScalar(heightOff)))
+            scene.add(sprite)
+            capList.push({ sprite, mat, angle, maxRadius, heightOff })
           }
           const animCap = () => {
             const elapsed = performance.now() - capT0
             if (elapsed >= 4000) {
-              for (const p of capList) { scene.remove(p.mesh); p.mat.dispose() }
-              capGeo.dispose()
+              for (const p of capList) { scene.remove(p.sprite); p.mat.dispose() }
               return
             }
             for (const p of capList) {
               const base = stemTop.clone().add(impactNorm.clone().multiplyScalar(p.heightOff))
               const radius = Math.min(elapsed / 1200, 1) * p.maxRadius
-              p.mesh.position.copy(
+              p.sprite.position.copy(
                 base
                   .add(tan.clone().multiplyScalar(Math.cos(p.angle) * radius))
                   .add(btan.clone().multiplyScalar(Math.sin(p.angle) * radius)),
