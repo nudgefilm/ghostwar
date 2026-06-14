@@ -541,10 +541,14 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ player_id: player.id, code: redeemCode.trim() }),
-      }).then(r => r.json() as Promise<{ success: boolean; reward?: string; amount?: number; error?: string }>)
+      }).then(r => r.json() as Promise<{ success: boolean; reward?: string; amount?: number; nukes?: number; missiles?: number; error?: string }>)
 
       if (data.success) {
-        if (data.reward === 'missiles') {
+        if (data.reward === 'bundle') {
+          setNukes(prev => prev + (data.nukes ?? 0))
+          setMissiles(prev => prev + (data.missiles ?? 0))
+          setRedeemStatus({ type: 'success', message: `+${data.nukes} NUKES & +${data.missiles} MISSILES UNLOCKED` })
+        } else if (data.reward === 'missiles') {
           setMissiles(prev => prev + (data.amount ?? 0))
           setRedeemStatus({ type: 'success', message: `+${data.amount} MISSILES UNLOCKED` })
         } else {
@@ -1455,7 +1459,7 @@ export default function Home() {
             <span className="text-zinc-700">│</span>
             <a href="https://nudgefilm.gumroad.com/l/nneaar" target="_blank" rel="noopener noreferrer"
               className="text-zinc-600 hover:text-zinc-400 transition-colors">
-              Get Nukes ($20) ▸
+              Get Bundle ($20) ▸
             </a>
           </div>
         </div>

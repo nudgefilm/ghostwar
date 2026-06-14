@@ -1,10 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const PRODUCTS = [
-  { product_id: 'MUFaBaVZasH2sje5qU-OAQ==', permalink: 'tbyskm', reward: 'missiles', amount: 100, field: 'missiles_remaining' },
-  { product_id: 'V2kdAYosv6oKhuGfOVZgww==', permalink: 'nneaar', reward: 'nukes',    amount: 2,   field: 'nukes_remaining'   },
-] as const
+type Product = {
+  product_id: string
+  permalink: string
+  updates: Record<string, number>
+  response: Record<string, unknown>
+}
+
+const PRODUCTS: Product[] = [
+  {
+    product_id: 'MUFaBaVZasH2sje5qU-OAQ==',
+    permalink: 'tbyskm',
+    updates: { missiles_remaining: 100 },
+    response: { reward: 'missiles', amount: 100 },
+  },
+  {
+    product_id: 'V2kdAYosv6oKhuGfOVZgww==',
+    permalink: 'nneaar',
+    updates: { nukes_remaining: 2, missiles_remaining: 500 },
+    response: { reward: 'bundle', nukes: 2, missiles: 500 },
+  },
+]
 
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>
@@ -43,11 +60,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'CODE_ALREADY_USED' })
     }
 
-    // First use — grant reward
+    // First use — fetch current values and apply all updates atomically
     const supabase = createAdminClient()
+    const fields = Object.keys(product.updates).join(', ')
     const { data: player } = await supabase
       .from('players')
-      .select(product.field)
+      .select(fields)
       .eq('id', player_id as string)
       .single()
 
@@ -55,13 +73,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'PLAYER_NOT_FOUND' }, { status: 404 })
     }
 
-    const current = ((player as Record<string, unknown>)[product.field] as number) ?? 0
+    const patch: Record<string, number> = {}
+    for (const [field, delta] of Object.entries(product.updates)) {
+      patch[field] = (((player as Record<string, unknown>)[field] as number) ?? 0) + delta
+    }
+
     await supabase
       .from('players')
-      .update({ [product.field]: current + product.amount })
+      .update(patch)
       .eq('id', player_id as string)
 
-    return NextResponse.json({ success: true, reward: product.reward, amount: product.amount })
+    return NextResponse.json({ success: true, ...product.response })
   }
 
   return NextResponse.json({ success: false, error: 'INVALID_CODE' })
