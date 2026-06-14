@@ -675,8 +675,69 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     }
     window.addEventListener('resize', onResize)
 
+    // ── Shooting star — once per hour, travels behind the globe ─────────────
+    const triggerShootingStar = () => {
+      const goRight = Math.random() < 0.5
+      const yOff = (Math.random() - 0.5) * 1.5
+      const starStart = new THREE.Vector3(goRight ? -5.5 : 5.5,  1.2 + yOff, -4)
+      const starEnd   = new THREE.Vector3(goRight ?  5.5 : -5.5, -1.2 + yOff, -4)
+
+      const starCanvas = document.createElement('canvas')
+      starCanvas.width = 64; starCanvas.height = 64
+      const starCtx = starCanvas.getContext('2d')!
+      const starGrad = starCtx.createRadialGradient(32, 32, 0, 32, 32, 32)
+      starGrad.addColorStop(0,   'rgba(255,255,255,1)')
+      starGrad.addColorStop(0.3, 'rgba(180,210,255,0.9)')
+      starGrad.addColorStop(1,   'rgba(100,160,255,0)')
+      starCtx.fillStyle = starGrad
+      starCtx.fillRect(0, 0, 64, 64)
+      const starTex = new THREE.CanvasTexture(starCanvas)
+
+      type StarP = { sprite: THREE.Sprite; mat: THREE.SpriteMaterial; lag: number; baseOp: number }
+      const starParticles: StarP[] = []
+
+      for (let i = 0; i < 11; i++) {
+        const isHead = i === 0
+        const mat = new THREE.SpriteMaterial({
+          map: starTex,
+          color: isHead ? 0xFFFFFF : 0xAADDFF,
+          transparent: true,
+          opacity: isHead ? 1.0 : 0.8 - (i - 1) * (0.75 / 9),
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        })
+        const sprite = new THREE.Sprite(mat)
+        const sz = isHead ? 0.4 : 0.28 - (i - 1) * 0.024
+        sprite.scale.set(sz, sz, 1)
+        sprite.position.copy(starStart)
+        scene.add(sprite)
+        starParticles.push({ sprite, mat, lag: i * 0.04, baseOp: mat.opacity })
+      }
+
+      const starT0 = performance.now()
+      const STAR_DUR = 2000
+      const animStar = () => {
+        const elapsed = performance.now() - starT0
+        const fadeOut = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 400))
+        for (const p of starParticles) {
+          const t = Math.max(0, Math.min(1, elapsed / STAR_DUR - p.lag))
+          p.sprite.position.lerpVectors(starStart, starEnd, t)
+          p.mat.opacity = p.baseOp * fadeOut
+        }
+        if (elapsed < STAR_DUR) {
+          requestAnimationFrame(animStar)
+        } else {
+          for (const p of starParticles) { scene.remove(p.sprite); p.mat.dispose() }
+          starTex.dispose()
+        }
+      }
+      requestAnimationFrame(animStar)
+    }
+    const starInterval = setInterval(triggerShootingStar, 3600000)
+
     return () => {
       cancelAnimationFrame(animId)
+      clearInterval(starInterval)
       window.removeEventListener('resize', onResize)
       controls.dispose()
       renderer.dispose()
