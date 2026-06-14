@@ -153,6 +153,31 @@ export default function Home() {
     loadCountries()
   }, [])
 
+  // ── DAMAGE RANKINGS: load from localStorage on mount (daily reset at 00:00 UTC) ──
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ghostwar_recent_strikes')
+      if (saved) {
+        const { strikes, date } = JSON.parse(saved)
+        const today = new Date().toISOString().slice(0, 10)
+        if (date === today) {
+          setDamagedRankings(strikes)
+        } else {
+          localStorage.removeItem('ghostwar_recent_strikes')
+        }
+      }
+    } catch {}
+  }, [])
+
+  // ── DAMAGE RANKINGS: persist to localStorage on every update ─────────────
+  useEffect(() => {
+    if (damagedRankings.length === 0) return
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      localStorage.setItem('ghostwar_recent_strikes', JSON.stringify({ strikes: damagedRankings, date: today }))
+    } catch {}
+  }, [damagedRankings])
+
   // ── Restore session from localStorage ────────────────────────────────────
   useEffect(() => {
     try {
