@@ -72,6 +72,7 @@ export default function Home() {
   const [countries, setCountries] = useState<Record<string, CountryRow>>({})
   const [isLaunching, setIsLaunching] = useState(false)
   const [interceptAlert, setInterceptAlert] = useState<string | null>(null)
+  const [nukeReward, setNukeReward] = useState<number | null>(null)
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -195,6 +196,7 @@ export default function Home() {
       missile_id?: string
       arrives_at?: string
       flight_seconds?: number
+      nukes_earned?: number
       error?: string
     }>).catch(() => null)
 
@@ -220,6 +222,11 @@ export default function Home() {
         }
         if (weaponType === 'missile') setMissiles(prev => prev - quantity)
         else setNukes(prev => prev - quantity)
+        if (data.nukes_earned && data.nukes_earned > 0) {
+          setNukes(prev => prev + data.nukes_earned!)
+          setNukeReward(data.nukes_earned!)
+          setTimeout(() => setNukeReward(null), 4000)
+        }
       }
     } finally {
       launchingRef.current = false
@@ -249,6 +256,13 @@ export default function Home() {
       {interceptAlert && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 border border-[#FF2233] bg-[#FF2233]/10 neon-glow text-xs tracking-widest">
           {interceptAlert}
+        </div>
+      )}
+
+      {/* ── Nuke reward alert ── */}
+      {nukeReward && (
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 border border-orange-500 bg-orange-500/10 text-orange-400 text-xs tracking-widest">
+          ☢️ NUKE ACQUIRED +{nukeReward}
         </div>
       )}
 

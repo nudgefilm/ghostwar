@@ -81,10 +81,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'INSUFFICIENT_AMMO' }, { status: 400 })
   }
 
-  // Deduct ammo
+  // Tally missiles fired so far to calculate nuke reward
+  let nukesEarned = 0
+  if (!isNuke) {
+    const { data: firedRows } = await supabase
+      .from('missiles')
+      .select('quantity')
+      .eq('launcher_id', launcher_id as string)
+      .eq('type', 'missile')
+    const prevTotal = firedRows?.reduce((s, r) => s + (r.quantity as number), 0) ?? 0
+    nukesEarned = Math.floor((prevTotal + qty) / 1000) - Math.floor(prevTotal / 1000)
+  }
+
+  // Deduct ammo (and award nukes if earned, atomically per field)
+  const ammoUpdate: Record<string, number> = { [ammoField]: currentAmmo - qty }
+  if (nukesEarned > 0) ammoUpdate.nukes_remaining = playerData.nukes_remaining + nukesEarned
+
   const { error: updateError } = await supabase
     .from('players')
-    .update({ [ammoField]: currentAmmo - qty })
+    .update(ammoUpdate)
     .eq('id', launcher_id)
 
   if (updateError) {
@@ -130,5 +145,6 @@ export async function POST(req: NextRequest) {
     missile_id: missileData.id,
     arrives_at,
     flight_seconds,
+    nukes_earned: nukesEarned,
   })
 }
