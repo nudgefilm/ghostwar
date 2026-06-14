@@ -655,18 +655,18 @@ export default function Home() {
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
           <span className="text-zinc-500 text-[10px]">// GLOBAL WARFARE SIM</span>
         </div>
-        <div className="flex-1 relative overflow-hidden flex items-center justify-center h-full">
+        <div className="flex-1 relative overflow-hidden h-full">
           {/* War Status Bar */}
           <span
-            className="absolute text-zinc-400 text-[10px] tracking-wider truncate pointer-events-none transition-opacity duration-500"
+            className="absolute inset-0 flex items-center justify-center text-zinc-400 text-[10px] tracking-wider whitespace-nowrap pointer-events-none transition-opacity duration-500"
             style={{ opacity: hofPhase === 'status' ? 1 : 0 }}
           >
             {new Date().toISOString().slice(0, 10)} │ {onlineNations.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
           </span>
-          {/* Hall of Fame Ticker */}
+          {/* Hall of Fame Ticker — same inset-0 bounds as war status, scroll is centered */}
           {hofEntries.length > 0 && (
             <div
-              className="absolute w-full overflow-hidden pointer-events-none transition-opacity duration-500"
+              className="absolute inset-0 overflow-hidden flex items-center justify-center pointer-events-none transition-opacity duration-500"
               style={{ opacity: hofPhase === 'hof' ? 1 : 0 }}
             >
               <div className="hof-scroll flex w-max whitespace-nowrap">
