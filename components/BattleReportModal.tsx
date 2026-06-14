@@ -26,18 +26,18 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
     : null
 
   const rankStr = report.oldRank != null && report.newRank != null
-    ? `${report.oldRank}위 → ${report.newRank}위 ${
+    ? `#${report.oldRank} → #${report.newRank} ${
         rankDiff != null && rankDiff > 0 ? `▲${rankDiff}`
         : rankDiff != null && rankDiff < 0 ? `▼${Math.abs(rankDiff)}`
         : '—'}`
     : '—'
 
   const rows: [string, string][] = [
-    ['타격 성공률', `${report.successRate}%`],
-    ['요격된 미사일', `${report.intercepted}기`],
-    ['인프라 파괴율', report.infrastructureDamage != null ? `${report.infrastructureDamage}%` : '—'],
-    ['추정 경제 피해', report.economicDamage],
-    ...(report.role === 'attacker' ? [['세계 랭킹 변동', rankStr] as [string, string]] : []),
+    ['STRIKE SUCCESS RATE', `${report.successRate}%`],
+    ['MISSILES INTERCEPTED', `${report.intercepted}`],
+    ['INFRASTRUCTURE DAMAGE', report.infrastructureDamage != null ? `${report.infrastructureDamage}%` : '—'],
+    ['ESTIMATED ECONOMIC DAMAGE', report.economicDamage],
+    ...(report.role === 'attacker' ? [['WORLD RANK CHANGE', rankStr] as [string, string]] : []),
   ]
 
   return (
