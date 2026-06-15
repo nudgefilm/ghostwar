@@ -135,6 +135,7 @@ export default function Home() {
   const launchedMissileIdsRef = useRef<Set<string>>(new Set())
   const onImpactCallCountRef = useRef<Map<string, number>>(new Map())
   const missileResultsRef = useRef<Map<string, Promise<boolean>>>(new Map())
+  const missileOutcomeRef = useRef<Map<string, boolean>>(new Map())
   const impactSoundCountRef = useRef(0)
   const impactSoundResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const threatResolvedRef = useRef<Set<string>>(new Set())
@@ -807,18 +808,24 @@ export default function Home() {
               impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
               if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
             } else if (isOwnMissile) {
-              const storedPromise = missileResultsRef.current.get(data.missileId)
-              if (storedPromise) {
-                storedPromise.then(wasIntercepted => {
-                  if (wasIntercepted) {
-                    SoundEngine.playIntercept()
-                  } else {
-                    impactSoundCountRef.current++
-                    if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
-                    impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
-                    if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
-                  }
-                })
+              const playSoundForOutcome = (wasIntercepted: boolean) => {
+                if (wasIntercepted) {
+                  SoundEngine.playIntercept()
+                } else {
+                  impactSoundCountRef.current++
+                  if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
+                  impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
+                  if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
+                }
+              }
+              const knownOutcome = missileOutcomeRef.current.get(data.missileId)
+              if (knownOutcome !== undefined) {
+                // API already responded — play synchronously (mirrors defender path)
+                playSoundForOutcome(knownOutcome)
+              } else {
+                // API still in flight — queue on Promise as fallback
+                const storedPromise = missileResultsRef.current.get(data.missileId)
+                storedPromise?.then(playSoundForOutcome).catch(() => {})
               }
             }
             return
@@ -922,6 +929,7 @@ export default function Home() {
               old_rank: number | null; new_rank: number | null
             }) => {
               if (_resolveIntercepted) _resolveIntercepted(Boolean(result?.was_intercepted))
+              if (data.missileId) missileOutcomeRef.current.set(data.missileId, Boolean(result?.was_intercepted))
               if (!result.success) return
 
               // Attacker's own missile: now we know the outcome (1st missile's visual only)
