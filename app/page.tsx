@@ -659,8 +659,14 @@ export default function Home() {
       if (data?.success && data.flight_seconds) {
         const toCoords = COUNTRY_COORDS[targetCountry]
         if (fromCoords && toCoords) {
-          if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
-          else SoundEngine.playLaunch()
+          if (weaponType === 'nuke') {
+            SoundEngine.playNukeLaunch()
+          } else {
+            const plays = Math.min(quantity, 5)
+            for (let i = 0; i < plays; i++) {
+              setTimeout(() => SoundEngine.playLaunch(), i * 130)
+            }
+          }
           console.log(`[LAUNCH-SELF] id=${data.missile_id?.slice(0,8)} qty=${quantity} type=${weaponType}`)
           if (data.missile_id) globeRef.current?.suppressExplosion(data.missile_id)
           globeRef.current?.launchMissile(
@@ -819,18 +825,21 @@ export default function Home() {
           }
           processedMissileIdsRef.current.add(data.missileId)
           console.log(`[ONIMPACT-CALL] callIndex=${_callIdx} isOwnMissile=${isOwnMissile} isIntercepted=false soundCount=${impactSoundCountRef.current} willPlaySound=${!isOwnMissile} (FIRST)`)
-          console.log(`[IMPACT-FIRST] id=${data.missileId.slice(0,8)} isThreat=${incomingThreats.some(t => t.id === data.missileId)} defenseReadiness=${defenseReadiness}`)
+          // Read defense state from ref — avoids stale closure when rAF fires before
+          // React's useEffect syncs onImpactRef to the latest render's closure.
+          const _def = defenseStateRef.current
+          console.log(`[IMPACT-FIRST] id=${data.missileId.slice(0,8)} isThreat=${_def.incomingThreats.some(t => t.id === data.missileId)} defenseReadiness=${_def.defenseReadiness}`)
 
           // ── Interception judgment (synchronous, no timer race) ────────────
-          const threat = incomingThreats.find(t => t.id === data.missileId)
+          const threat = _def.incomingThreats.find(t => t.id === data.missileId)
           if (threat) {
             let intercepted = false
             let useNuke = false
             if (threat.type === 'nuke') {
-              intercepted = nukeInterceptArmed && nukes > 0
+              intercepted = _def.nukeInterceptArmed && _def.nukes > 0
               useNuke = intercepted
             } else {
-              intercepted = Math.random() < defenseReadiness / 100
+              intercepted = Math.random() < _def.defenseReadiness / 100
             }
 
             // Clean up threat state regardless of outcome
