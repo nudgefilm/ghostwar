@@ -155,6 +155,7 @@ export default function Home() {
   const [showRules, setShowRules] = useState(false)
   const [showTutorial, setShowTutorial] = useState(false)
   const [tutorialStep, setTutorialStep] = useState(0)
+  const tutorialTimersRef = useRef<ReturnType<typeof setTimeout>[]>([])
   const [redeemCode, setRedeemCode] = useState('')
   const [redeemStatus, setRedeemStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isRedeeming, setIsRedeeming] = useState(false)
@@ -517,11 +518,19 @@ export default function Home() {
     }
   }, [])
 
+  const cancelTutorialHighlight = () => {
+    tutorialTimersRef.current.forEach(clearTimeout)
+    tutorialTimersRef.current = []
+    setTutorialStep(0)
+  }
+
   const startTutorialHighlight = () => {
+    tutorialTimersRef.current.forEach(clearTimeout)
+    tutorialTimersRef.current = []
     for (let i = 1; i <= 5; i++) {
-      setTimeout(() => setTutorialStep(i), (i - 1) * 1500)
+      tutorialTimersRef.current.push(setTimeout(() => setTutorialStep(i), (i - 1) * 2000))
     }
-    setTimeout(() => setTutorialStep(0), 5 * 1500)
+    tutorialTimersRef.current.push(setTimeout(() => setTutorialStep(0), 5 * 2000))
   }
 
   const handleEnter = (p: Player) => {
@@ -784,6 +793,22 @@ export default function Home() {
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 border border-[#FF2233] bg-[#FF2233]/10 neon-glow text-xs tracking-widest">
           {interceptAlert}
         </div>
+      )}
+
+      {/* Tutorial sequence dismiss button */}
+      {tutorialStep > 0 && (
+        <button
+          onClick={cancelTutorialHighlight}
+          className="fixed top-12 right-2 z-50 w-7 h-7 flex items-center justify-center text-[11px] font-bold cursor-pointer pointer-events-auto"
+          style={{
+            color: '#00AAFF',
+            border: '1px solid rgba(0,170,255,0.45)',
+            background: 'rgba(0,0,0,0.82)',
+            boxShadow: '0 0 8px rgba(0,170,255,0.25)',
+          }}
+        >
+          ✕
+        </button>
       )}
 
       {/* Nuke reward alert */}
@@ -1084,6 +1109,11 @@ export default function Home() {
 
         {/* WEAPONS */}
         <div className={`pointer-events-auto p-3${tutorialStep === 2 ? ' tutorial-highlight' : ''}`} style={CARD}>
+          {tutorialStep === 2 && (
+            <div className="text-[10px] tracking-wider mb-2 pb-1.5 border-b" style={{ color: '#00AAFF', borderColor: 'rgba(0,170,255,0.25)' }}>
+              ▶ Choose missile or nuke (nuke requires stock)
+            </div>
+          )}
           <div className="text-zinc-300 text-[10px] tracking-widest mb-2">WEAPONS</div>
           <div className="flex gap-2 mb-3">
             <button
@@ -1127,6 +1157,11 @@ export default function Home() {
 
         {/* TARGET */}
         <div className={`pointer-events-auto p-3${tutorialStep === 1 ? ' tutorial-highlight' : ''}`} style={CARD}>
+          {tutorialStep === 1 && (
+            <div className="text-[10px] tracking-wider mb-2 pb-1.5 border-b" style={{ color: '#00AAFF', borderColor: 'rgba(0,170,255,0.25)' }}>
+              ▶ Select your target nation
+            </div>
+          )}
           <div className="text-zinc-300 text-[10px] tracking-widest mb-2">TARGET</div>
           <select
             value={targetCountry ?? ''}
@@ -1178,6 +1213,11 @@ export default function Home() {
 
         {/* LAUNCH */}
         <div className={`pointer-events-auto p-3${tutorialStep === 3 ? ' tutorial-highlight' : ''}`} style={CARD}>
+          {tutorialStep === 3 && (
+            <div className="text-[10px] tracking-wider mb-2 pb-1.5 border-b" style={{ color: '#00AAFF', borderColor: 'rgba(0,170,255,0.25)' }}>
+              ▶ Launch your attack
+            </div>
+          )}
           <button
             onClick={handleLaunch}
             disabled={launchDisabled}
@@ -1193,6 +1233,11 @@ export default function Home() {
             className={`pointer-events-auto p-3 animate-pulse${tutorialStep === 4 ? ' tutorial-highlight' : ''}`}
             style={{ ...CARD, background: 'rgba(255,34,51,0.15)', borderColor: 'rgba(255,34,51,0.5)' }}
           >
+            {tutorialStep === 4 && (
+              <div className="text-[10px] tracking-wider mb-2 pb-1.5 border-b" style={{ color: '#00AAFF', borderColor: 'rgba(0,170,255,0.25)' }}>
+                ▶ Mash INTERCEPT to defend when under attack
+              </div>
+            )}
             <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold truncate">
               ⚠️ WARNING: {primaryThreat.launcher_country}발 발사체 {primaryThreat.quantity}기 탐지. 도달까지 {primaryTimeRemaining}초
             </div>
@@ -1238,6 +1283,11 @@ export default function Home() {
           </div>
         ) : (
           <div className={`pointer-events-auto p-3${tutorialStep === 4 ? ' tutorial-highlight' : ''}`} style={CARD}>
+            {tutorialStep === 4 && (
+              <div className="text-[10px] tracking-wider mb-2 pb-1.5 border-b" style={{ color: '#00AAFF', borderColor: 'rgba(0,170,255,0.25)' }}>
+                ▶ Mash INTERCEPT to defend when under attack
+              </div>
+            )}
             <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
             <button
               disabled
@@ -1506,6 +1556,11 @@ export default function Home() {
 
         {/* ARSENAL SUPPLY — redeem Gumroad codes */}
         <div className={`pointer-events-auto p-3${tutorialStep === 5 ? ' tutorial-highlight' : ''}`} style={CARD}>
+          {tutorialStep === 5 && (
+            <div className="text-[10px] tracking-wider mb-2 pb-1.5 border-b" style={{ color: '#00AAFF', borderColor: 'rgba(0,170,255,0.25)' }}>
+              ▶ Restock here when out of ammo
+            </div>
+          )}
           <div className="text-zinc-300 text-[10px] tracking-widest mb-2">ARSENAL SUPPLY</div>
           <div className="flex gap-1 mb-1.5">
             <input
