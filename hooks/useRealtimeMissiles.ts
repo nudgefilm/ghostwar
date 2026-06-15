@@ -71,6 +71,7 @@ export function useRealtimeMissiles({
     const poll = async () => {
       const since = lastPollTimeRef.current
       const now = new Date().toISOString()
+      lastPollTimeRef.current = now  // advance immediately so concurrent polls never share the same window
 
       const [{ data: newMissiles }, { data: newNews }] = await Promise.all([
         supabase
@@ -84,8 +85,6 @@ export function useRealtimeMissiles({
           .gt('created_at', since)
           .order('created_at', { ascending: true }),
       ])
-
-      lastPollTimeRef.current = now
 
       newMissiles?.forEach(m => callbacksRef.current.onMissile(m as MissileRow))
       newNews?.forEach(n => callbacksRef.current.onNews(n as NewsFeedRow))

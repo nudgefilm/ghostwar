@@ -131,6 +131,7 @@ export default function Home() {
   const launchingRef = useRef(false)
   const processedMissileIdsRef = useRef<Set<string>>(new Set())
   const interceptedMissilesRef = useRef<Set<string>>(new Set())
+  const launchedMissileIdsRef = useRef<Set<string>>(new Set())
   const impactSoundCountRef = useRef(0)
   const impactSoundResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const threatResolvedRef = useRef<Set<string>>(new Set())
@@ -299,24 +300,27 @@ export default function Home() {
       }
 
       if (missile.launcher_country !== player?.country_code) {
-        const fromCoords = COUNTRY_COORDS[missile.launcher_country]
-        const toCoords = COUNTRY_COORDS[missile.target_country]
-        if (fromCoords && toCoords) {
-          const remainingMs = Math.max(
-            1000,
-            new Date(missile.arrives_at).getTime() - Date.now(),
-          )
-          globeRef.current?.launchMissile(
-            fromCoords[0], fromCoords[1],
-            toCoords[0], toCoords[1],
-            missile.quantity,
-            missile.type as 'missile' | 'nuke',
-            remainingMs,
-            missile.id,
-            missile.target_country,
-            missile.launcher_country,
-          )
-          setActiveCount(prev => prev + missile.quantity)
+        if (!launchedMissileIdsRef.current.has(missile.id)) {
+          launchedMissileIdsRef.current.add(missile.id)
+          const fromCoords = COUNTRY_COORDS[missile.launcher_country]
+          const toCoords = COUNTRY_COORDS[missile.target_country]
+          if (fromCoords && toCoords) {
+            const remainingMs = Math.max(
+              1000,
+              new Date(missile.arrives_at).getTime() - Date.now(),
+            )
+            globeRef.current?.launchMissile(
+              fromCoords[0], fromCoords[1],
+              toCoords[0], toCoords[1],
+              missile.quantity,
+              missile.type as 'missile' | 'nuke',
+              remainingMs,
+              missile.id,
+              missile.target_country,
+              missile.launcher_country,
+            )
+            setActiveCount(prev => prev + missile.quantity)
+          }
         }
       }
     },
