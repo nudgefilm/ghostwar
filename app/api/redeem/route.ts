@@ -63,11 +63,11 @@ export async function POST(req: NextRequest) {
     // First use — fetch current values and apply all updates atomically
     const supabase = createAdminClient()
     const fields = Object.keys(product.updates).join(', ')
-    const { data: player } = await supabase
+    const { data: player } = (await supabase
       .from('players')
       .select(fields)
       .eq('id', player_id as string)
-      .single()
+      .single()) as unknown as { data: Record<string, number> | null }
 
     if (!player) {
       return NextResponse.json({ error: 'PLAYER_NOT_FOUND' }, { status: 404 })
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
     const patch: Record<string, number> = {}
     for (const [field, delta] of Object.entries(product.updates)) {
-      patch[field] = (((player as Record<string, unknown>)[field] as number) ?? 0) + delta
+      patch[field] = (player[field] ?? 0) + delta
     }
 
     await supabase
