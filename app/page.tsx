@@ -134,8 +134,6 @@ export default function Home() {
   const interceptedMissilesRef = useRef<Set<string>>(new Set())
   const launchedMissileIdsRef = useRef<Set<string>>(new Set())
   const onImpactCallCountRef = useRef<Map<string, number>>(new Map())
-  const missileResultsRef = useRef<Map<string, Promise<boolean>>>(new Map())
-  const missileOutcomeRef = useRef<Map<string, boolean>>(new Map())
   const impactSoundCountRef = useRef(0)
   const impactSoundResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const threatResolvedRef = useRef<Set<string>>(new Set())
@@ -807,26 +805,6 @@ export default function Home() {
               if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
               impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
               if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
-            } else if (isOwnMissile) {
-              const playSoundForOutcome = (wasIntercepted: boolean) => {
-                if (wasIntercepted) {
-                  SoundEngine.playIntercept()
-                } else {
-                  impactSoundCountRef.current++
-                  if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
-                  impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
-                  if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
-                }
-              }
-              const knownOutcome = missileOutcomeRef.current.get(data.missileId)
-              if (knownOutcome !== undefined) {
-                // API already responded — play synchronously (mirrors defender path)
-                playSoundForOutcome(knownOutcome)
-              } else {
-                // API still in flight — queue on Promise as fallback
-                const storedPromise = missileResultsRef.current.get(data.missileId)
-                storedPromise?.then(playSoundForOutcome).catch(() => {})
-              }
             }
             return
           }
@@ -899,13 +877,6 @@ export default function Home() {
           // ── Hit: play sound + call /api/impact ───────────────────────────
           // Own outgoing missile: defer sound until API confirms intercept vs hit.
           // Third-party missile: play immediately (no need to wait).
-          let _resolveIntercepted: ((v: boolean) => void) | null = null
-          if (isOwnMissile && data.missileId) {
-            missileResultsRef.current.set(
-              data.missileId,
-              new Promise<boolean>(resolve => { _resolveIntercepted = resolve }),
-            )
-          }
           if (!isOwnMissile) {
             impactSoundCountRef.current++
             if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
@@ -928,19 +899,25 @@ export default function Home() {
               prev_damage_percent: number; new_damage_percent: number
               old_rank: number | null; new_rank: number | null
             }) => {
-              if (_resolveIntercepted) _resolveIntercepted(Boolean(result?.was_intercepted))
-              if (data.missileId) missileOutcomeRef.current.set(data.missileId, Boolean(result?.was_intercepted))
               if (!result.success) return
 
-              // Attacker's own missile: now we know the outcome (1st missile's visual only)
+              // Attacker's own missile: visual for 1st + staggered sounds for all quantity
               if (isOwnMissile) {
                 const coords = COUNTRY_COORDS[data.targetCountry as string]
                 if (result.was_intercepted) {
-                  SoundEngine.playIntercept()
                   if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
                 } else {
-                  SoundEngine.playImpact(soundVolume)
                   if (coords) globeRef.current?.triggerRedExplosionAt(coords[0], coords[1], data.type as 'missile' | 'nuke')
+                }
+                const qty = result.quantity ?? 1
+                for (let i = 0; i < Math.min(qty, 5); i++) {
+                  setTimeout(() => {
+                    if (result.was_intercepted) {
+                      SoundEngine.playIntercept()
+                    } else {
+                      SoundEngine.playImpact(soundVolume)
+                    }
+                  }, i * 200)
                 }
               }
 
@@ -1010,7 +987,7 @@ export default function Home() {
               if (modalDelay > 0) setTimeout(() => setBattleReport(reportPayload), modalDelay)
               else setBattleReport(reportPayload)
             })
-            .catch(() => { if (_resolveIntercepted) _resolveIntercepted(false) })
+            .catch(() => {})
         }} />
       </div>
 
