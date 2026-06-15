@@ -264,7 +264,6 @@ export default function Home() {
         SoundEngine.init()
         SoundEngine.playAlert()
         setInterceptAlert(`⚠ INCOMING: ${missile.launcher_country} → ${missile.target_country}`)
-        setTimeout(() => setInterceptAlert(null), 4000)
       }
 
       // Track incoming threats for interception
@@ -471,7 +470,11 @@ export default function Home() {
 
       if (toResolve.length > 0) {
         const resolvedIds = new Set(toResolve.map(t => t.id))
-        setIncomingThreats(prev => prev.filter(t => !resolvedIds.has(t.id)))
+        setIncomingThreats(prev => {
+          const remaining = prev.filter(t => !resolvedIds.has(t.id))
+          if (remaining.length === 0) setInterceptAlert(null)
+          return remaining
+        })
         setDefenseReadiness(0)
         setNukeInterceptArmed(false)
       }
@@ -1152,10 +1155,8 @@ export default function Home() {
             className={`pointer-events-auto p-3 animate-pulse${tutorialStep === 4 ? ' tutorial-highlight' : ''}`}
             style={{ ...CARD, background: 'rgba(255,34,51,0.15)', borderColor: 'rgba(255,34,51,0.5)' }}
           >
-            <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold">DEFENSE SYSTEMS</div>
-            <div className="text-[#FF2233] text-[10px] mb-2 font-bold leading-snug">
-              ⚠ {primaryThreat.launcher_country} LAUNCHED {primaryThreat.quantity}{' '}
-              {primaryThreat.type.toUpperCase()}(S). IMPACT IN {primaryTimeRemaining}s
+            <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold truncate">
+              ⚠️ WARNING: {primaryThreat.launcher_country}발 발사체 {primaryThreat.quantity}기 탐지. 도달까지 {primaryTimeRemaining}초
             </div>
             {primaryThreat.type === 'nuke' ? (
               nukes > 0 ? (
