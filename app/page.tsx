@@ -666,7 +666,6 @@ export default function Home() {
             }
           }
           console.log(`[LAUNCH-SELF] id=${data.missile_id?.slice(0,8)} qty=${quantity} type=${weaponType}`)
-          if (data.missile_id) globeRef.current?.suppressExplosion(data.missile_id)
           globeRef.current?.launchMissile(
             fromCoords[0], fromCoords[1],
             toCoords[0], toCoords[1],
@@ -889,16 +888,11 @@ export default function Home() {
             }) => {
               if (!result.success) return
 
-              // Attacker's own missile: API response controls all visuals (sounds fire per-arrival in onImpact)
-              if (isOwnMissile) {
+              // Attacker's own missile: Globe auto-fires red on arrival; API response adds blue if intercepted
+              if (isOwnMissile && result.was_intercepted) {
                 const coords = COUNTRY_COORDS[data.targetCountry as string]
-                if (result.was_intercepted) {
-                  // All missiles were suppressed — show single blue interception effect
-                  if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
-                  SoundEngine.playIntercept()
-                } else {
-                  if (coords) globeRef.current?.triggerRedExplosionAt(coords[0], coords[1], data.type as 'missile' | 'nuke')
-                }
+                if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
+                SoundEngine.playIntercept()
               }
 
               // Update DAMAGE RANKINGS from API response — no DB re-fetch, mirrors LIVE STRIKES pattern
