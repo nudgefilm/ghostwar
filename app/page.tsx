@@ -1453,12 +1453,12 @@ export default function Home() {
           )}
           <div className="flex gap-2 text-[9px]">
             <a href="https://nudgefilm.gumroad.com/l/tbyskm" target="_blank" rel="noopener noreferrer"
-              className="text-zinc-500 hover:text-zinc-400 transition-colors">
+              className="text-zinc-400 hover:text-zinc-300 transition-colors">
               Get Missiles ($5) ▸
             </a>
-            <span className="text-zinc-600">│</span>
+            <span className="text-zinc-500">│</span>
             <a href="https://nudgefilm.gumroad.com/l/nneaar" target="_blank" rel="noopener noreferrer"
-              className="text-zinc-500 hover:text-zinc-400 transition-colors">
+              className="text-zinc-400 hover:text-zinc-300 transition-colors">
               Get Bundle ($20) ▸
             </a>
           </div>
