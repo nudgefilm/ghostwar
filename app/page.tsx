@@ -805,7 +805,7 @@ export default function Home() {
 
       {/* Globe — full screen */}
       <div className="fixed inset-0 z-0" style={{ width: '100vw', height: '100vh' }}>
-        <Globe ref={globeRef} onImpact={(data: ImpactData) => {
+        <Globe ref={globeRef} playerCountry={player?.country_code} onImpact={(data: ImpactData) => {
           SoundEngine.init()
           setActiveCount(prev => Math.max(0, prev - 1))
 
@@ -818,7 +818,10 @@ export default function Home() {
           impactSoundCountRef.current++
           if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
           impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
-          if (impactSoundCountRef.current <= 5) SoundEngine.playImpact()
+          const soundVolume = (data.type === 'nuke' ||
+            data.launcherCountry === player?.country_code ||
+            data.targetCountry === player?.country_code) ? 1.0 : 0.5
+          if (impactSoundCountRef.current <= 5) SoundEngine.playImpact(soundVolume)
 
           // Deduplicate API call: only process once per missile_id across quantity > 1 animations
           if (processedMissileIdsRef.current.has(data.missileId)) return

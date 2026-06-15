@@ -97,9 +97,10 @@ export interface ImpactData {
 
 interface GlobeProps {
   onImpact?: (data: ImpactData) => void
+  playerCountry?: string
 }
 
-const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
+const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, ref) => {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -107,6 +108,8 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
   const animsRef = useRef<AnimFn[]>([])
   const onImpactRef = useRef(onImpact)
   useEffect(() => { onImpactRef.current = onImpact }, [onImpact])
+  const playerCountryRef = useRef(playerCountry)
+  useEffect(() => { playerCountryRef.current = playerCountry }, [playerCountry])
 
   const missileInstancesRef = useRef<THREE.InstancedMesh | null>(null)
   const missileCoreInstancesRef = useRef<THREE.InstancedMesh | null>(null)
@@ -424,9 +427,11 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       }
       requestAnimationFrame(animTrail)
 
-      // Camera shake: longer/stronger for nuke
+      // Camera shake: nuke always shakes; missile only when player's country is involved
+      const pc = playerCountryRef.current
+      const playerInvolved = m.type === 'nuke' || m.launcherCountry === pc || m.targetCountry === pc
       const cam = cameraRef.current
-      if (cam) {
+      if (cam && playerInvolved) {
         const origPos = cam.position.clone()
         const shakeDur = m.type === 'nuke' ? 500 : 300
         const shakeAmt = m.type === 'nuke' ? 0.15 : 0.08

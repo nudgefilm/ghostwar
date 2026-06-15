@@ -93,14 +93,14 @@ export const SoundEngine = {
     rumble.start(t); rumble.stop(t + 2.0)
   },
 
-  playImpact() {
+  playImpact(volume = 1.0) {
     const ctx = this.ctx
     if (!ctx) return
     // Slight pitch variation (±12%) prevents identical simultaneous sounds from
     // cancelling each other out when a multi-missile salvo lands at the same time.
     const rate = 0.88 + Math.random() * 0.24
     if (this._buffers['impact']) {
-      this._playBuffer('impact', 1.0, rate)
+      this._playBuffer('impact', volume, rate)
       return
     }
     // Fallback: synthesized — vary boom base freq for same reason
@@ -115,7 +115,7 @@ export const SoundEngine = {
     const crackSrc = ctx.createBufferSource()
     crackSrc.buffer = crackBuf
     const crackGain = ctx.createGain()
-    crackGain.gain.setValueAtTime(2.2, t)
+    crackGain.gain.setValueAtTime(2.2 * volume, t)
     crackSrc.connect(crackGain); crackGain.connect(ctx.destination)
     crackSrc.start(t)
     const boom = ctx.createOscillator()
@@ -123,7 +123,7 @@ export const SoundEngine = {
     boom.type = 'sine'
     boom.frequency.setValueAtTime(boomFreq, t)
     boom.frequency.exponentialRampToValueAtTime(18, t + 2.5)
-    boomGain.gain.setValueAtTime(1.6, t)
+    boomGain.gain.setValueAtTime(1.6 * volume, t)
     boomGain.gain.exponentialRampToValueAtTime(0.001, t + 2.5)
     boom.connect(boomGain); boomGain.connect(ctx.destination)
     boom.start(t); boom.stop(t + 2.5)
@@ -137,7 +137,7 @@ export const SoundEngine = {
     rumbleFilter.type = 'lowpass'
     rumbleFilter.frequency.value = 220
     const rumbleGain = ctx.createGain()
-    rumbleGain.gain.setValueAtTime(0.9, t)
+    rumbleGain.gain.setValueAtTime(0.9 * volume, t)
     rumbleGain.gain.exponentialRampToValueAtTime(0.001, t + 3.0)
     rumbleSrc.connect(rumbleFilter); rumbleFilter.connect(rumbleGain); rumbleGain.connect(ctx.destination)
     rumbleSrc.start(t)
