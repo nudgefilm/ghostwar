@@ -783,7 +783,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         depthTest: true, depthWrite: false, blending: THREE.AdditiveBlending,
       })
       const headSprite = new THREE.Sprite(headMat)
-      headSprite.scale.set(0.09, 0.09, 1)
+      headSprite.scale.set(0.054, 0.054, 1)
       scene.add(headSprite)
 
       // Trail line — vertex color, green fading to black (0x00ff88 = 0,1.0,0.533)
