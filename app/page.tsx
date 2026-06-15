@@ -923,8 +923,8 @@ export default function Home() {
                 targetDestroyed: !result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100,
                 alliance_reduction_percent: !!isAttacker && result.alliance_reduction > 0 ? result.alliance_reduction : undefined,
               }
-              // Nuke: wait for mushroom cloud to finish before showing modal
-              const modalDelay = type === 'nuke' ? 5500 : 0
+              // Nuke: wait for mushroom cloud; intercepted: wait for blue effect to clear
+              const modalDelay = type === 'nuke' ? 5500 : result.was_intercepted ? 900 : 0
               if (modalDelay > 0) setTimeout(() => setBattleReport(reportPayload), modalDelay)
               else setBattleReport(reportPayload)
             })
