@@ -808,7 +808,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const animStar = () => {
         const elapsed = performance.now() - starT0
         const t = Math.min(elapsed / STAR_DUR, 1)
-        const pulse   = 0.4 + 0.6 * (1 - Math.cos(2 * Math.PI * elapsed / 6000)) / 2  // 40%→100%→40% 반복 (6초 주기)
+        const pulse   = 0.4 + 0.6 * (1 - Math.cos(2 * Math.PI * elapsed / 2000)) / 2  // 40%→100%→40% 반복 (2초 주기)
         const fadeOut = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 3000))
         const brightness = pulse * fadeOut
 
