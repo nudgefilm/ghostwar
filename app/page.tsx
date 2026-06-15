@@ -112,9 +112,7 @@ function HofRow({
 
 // ── Card wrapper style ────────────────────────────────────────────────────────
 const CARD: React.CSSProperties = {
-  background: 'rgba(0,0,0,0.6)',
-  backdropFilter: 'blur(12px)',
-  WebkitBackdropFilter: 'blur(12px)',
+  background: 'rgba(0,0,0,0.3)',
   border: '1px solid rgba(255,34,51,0.18)',
 }
 
