@@ -787,7 +787,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       scene.add(headSprite)
 
       // Trail line — vertex color, green fading to black (0x00ff88 = 0,1.0,0.533)
-      const TLEN = 28
+      const TLEN = 150
       const tPos = new Float32Array(TLEN * 3)
       const tCol = new Float32Array(TLEN * 3)
       const tGeo = new THREE.BufferGeometry()
@@ -819,8 +819,10 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         const hn = history.length
         for (let i = 0; i < hn; i++) {
           tPos[i*3]=history[i].x; tPos[i*3+1]=history[i].y; tPos[i*3+2]=history[i].z
-          const s = i / Math.max(hn - 1, 1)   // 0=head,1=tail
-          const g = (1 - s) * fadeOut
+          const s = i / Math.max(hn - 1, 1)          // 0=head → 1=tail
+          const dimNearHead = Math.min(1, s / 0.18)  // head 쪽 18% 구간: 흐릿하게 연결
+          const tailDecay   = Math.pow(Math.max(0, 1 - s), 1.1)  // 이후 점차 소멸
+          const g = dimNearHead * tailDecay * fadeOut
           tCol[i*3]=0; tCol[i*3+1]=g; tCol[i*3+2]=g*0.53
         }
         tGeo.setDrawRange(0, hn)
