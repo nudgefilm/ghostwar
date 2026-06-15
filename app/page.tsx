@@ -526,6 +526,13 @@ export default function Home() {
   }
 
   const handleLogout = () => {
+    if (player) {
+      fetch('/api/player/exit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player_id: player.id }),
+      }).catch(() => { /* ignore */ })
+    }
     try { localStorage.removeItem('ghostwar_player') } catch { /* ignore */ }
     setPlayer(null)
     setMissiles(0)
