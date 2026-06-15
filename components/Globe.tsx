@@ -803,12 +803,12 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
       const history: THREE.Vector3[] = []
       const starT0 = performance.now()
-      const STAR_DUR = 7000
+      const STAR_DUR = 18000
 
       const animStar = () => {
         const elapsed = performance.now() - starT0
         const t = Math.min(elapsed / STAR_DUR, 1)
-        const fadeOut = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 1200))
+        const fadeOut = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 3000))
 
         const cur = new THREE.Vector3().lerpVectors(starStart, starEnd, t)
         headSprite.position.copy(cur)
