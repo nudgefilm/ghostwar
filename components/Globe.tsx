@@ -756,10 +756,9 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
     // ── Shooting star — continent-line color, travels behind upper globe ──────
     const triggerShootingStar = () => {
-      const goRight = Math.random() < 0.5
-      const yBase = 0.95 + Math.random() * 0.3          // upper globe: 0.95–1.25
-      const starStart = new THREE.Vector3(goRight ? -2.6 : 2.6, yBase, -1.4)
-      const starEnd   = new THREE.Vector3(goRight ?  2.6 : -2.6, yBase - 0.35, -1.4)
+      const yBase = 1.0 + Math.random() * 0.25            // upper globe: 1.0–1.25
+      const starStart = new THREE.Vector3(2.6, yBase, -1.4)          // 우측 상단
+      const starEnd   = new THREE.Vector3(-2.0, yBase - 0.55, -1.4) // 좌측 하단으로
 
       // Head sprite — bright 💥 cross texture in continent-line green
       const hc = document.createElement('canvas')
@@ -804,12 +803,12 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
 
       const history: THREE.Vector3[] = []
       const starT0 = performance.now()
-      const STAR_DUR = 1800
+      const STAR_DUR = 7000
 
       const animStar = () => {
         const elapsed = performance.now() - starT0
         const t = Math.min(elapsed / STAR_DUR, 1)
-        const fadeOut = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 350))
+        const fadeOut = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 1200))
 
         const cur = new THREE.Vector3().lerpVectors(starStart, starEnd, t)
         headSprite.position.copy(cur)
