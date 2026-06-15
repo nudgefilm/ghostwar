@@ -808,11 +808,13 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const animStar = () => {
         const elapsed = performance.now() - starT0
         const t = Math.min(elapsed / STAR_DUR, 1)
+        const fadeIn  = 0.7 + 0.3 * Math.min(1, elapsed / 10000)  // 0.7→1.0, 10초에 걸쳐 서서히
         const fadeOut = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 3000))
+        const brightness = fadeIn * fadeOut
 
         const cur = new THREE.Vector3().lerpVectors(starStart, starEnd, t)
         headSprite.position.copy(cur)
-        headMat.opacity = fadeOut
+        headMat.opacity = brightness
 
         history.unshift(cur.clone())
         if (history.length > TLEN) history.pop()
@@ -822,13 +824,13 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
           const s = i / Math.max(hn - 1, 1)          // 0=head → 1=tail
           const dimNearHead = Math.min(1, s / 0.18)  // head 쪽 18% 구간: 흐릿하게 연결
           const tailDecay   = Math.pow(Math.max(0, 1 - s), 1.1)  // 이후 점차 소멸
-          const g = dimNearHead * tailDecay * fadeOut
+          const g = dimNearHead * tailDecay * brightness
           tCol[i*3]=0; tCol[i*3+1]=g; tCol[i*3+2]=g*0.53
         }
         tGeo.setDrawRange(0, hn)
         tGeo.attributes.position.needsUpdate = true
         tGeo.attributes.color.needsUpdate = true
-        tMat.opacity = fadeOut
+        tMat.opacity = brightness
 
         if (t < 1) {
           requestAnimationFrame(animStar)
