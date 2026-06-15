@@ -233,28 +233,42 @@ export default function Home() {
 
   // ── Restore session from localStorage ────────────────────────────────────
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('ghostwar_player')
-      if (!stored) return
-      const p = JSON.parse(stored) as Player
-      if (!p.id || !p.nickname || !p.country_code) return
-      setPlayer(p)
+    const restore = async () => {
+      try {
+        const stored = localStorage.getItem('ghostwar_player')
+        if (!stored) return
+        const p = JSON.parse(stored) as Player
+        if (!p.id || !p.nickname || !p.country_code) return
 
-      const supabase = createClient()
-      supabase
-        .from('players')
-        .select('missiles_remaining, nukes_remaining')
-        .eq('id', p.id)
-        .single()
-        .then(({ data }) => {
-          if (data) {
-            setMissiles(data.missiles_remaining)
-            setNukes(data.nukes_remaining)
-          }
+        // Call enter to increment online_users — same path as normal login
+        const res = await fetch('/api/player/enter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname: p.nickname, country_code: p.country_code }),
         })
-    } catch {
-      localStorage.removeItem('ghostwar_player')
+        const json = await res.json() as { success?: boolean; player?: Player; error?: string }
+        if (!json.player) {
+          localStorage.removeItem('ghostwar_player')
+          return
+        }
+        const restored = json.player
+        setPlayer(restored)
+        try { localStorage.setItem('ghostwar_player', JSON.stringify(restored)) } catch { /* ignore */ }
+
+        const { data } = await createClient()
+          .from('players')
+          .select('missiles_remaining, nukes_remaining')
+          .eq('id', restored.id)
+          .single()
+        if (data) {
+          setMissiles(data.missiles_remaining)
+          setNukes(data.nukes_remaining)
+        }
+      } catch {
+        localStorage.removeItem('ghostwar_player')
+      }
     }
+    restore()
   }, [])
 
   // ── Realtime callbacks ────────────────────────────────────────────────────
@@ -481,6 +495,27 @@ export default function Home() {
     }, 500)
     return () => clearInterval(timer)
   }, [])  // stable: reads from defenseStateRef
+
+  // ── Decrement online_users on tab close / navigation ─────────────────────
+  useEffect(() => {
+    let fired = false
+    const handleUnload = () => {
+      if (fired) return
+      fired = true
+      const p = defenseStateRef.current.player
+      if (!p) return
+      navigator.sendBeacon(
+        '/api/player/exit',
+        new Blob([JSON.stringify({ player_id: p.id })], { type: 'application/json' }),
+      )
+    }
+    window.addEventListener('pagehide', handleUnload)
+    window.addEventListener('beforeunload', handleUnload)
+    return () => {
+      window.removeEventListener('pagehide', handleUnload)
+      window.removeEventListener('beforeunload', handleUnload)
+    }
+  }, [])
 
   const startTutorialHighlight = () => {
     for (let i = 1; i <= 5; i++) {
