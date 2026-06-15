@@ -1288,6 +1288,11 @@ export default function Home() {
                 {primaryThreat.type === 'nuke' ? (nukeInterceptArmed ? '100%' : '0%') : `${defenseReadiness}%`}
               </span>
             </div>
+            {primaryThreat.type !== 'nuke' && defenseReadiness < 100 && (
+              <div className="text-[9px] tracking-wider mt-1" style={{ color: 'rgba(255,34,51,0.5)' }}>
+                Shield requires 100%
+              </div>
+            )}
           </div>
         ) : (
           <div className={`pointer-events-auto p-3${tutorialStep === 4 ? ' tutorial-highlight' : ''}`} style={CARD}>

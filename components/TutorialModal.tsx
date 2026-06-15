@@ -24,7 +24,7 @@ const STEPS: { icon: string; label: string; text: string }[] = [
   {
     icon: '🛡️',
     label: 'INTERCEPT',
-    text: 'Under attack? Rapidly click INTERCEPT to build interception probability before impact. Nukes can only be countered by nukes.',
+    text: 'Under attack? Rapidly click INTERCEPT to build readiness — shield activates only at 100% readiness. Nukes can only be countered by nukes.',
   },
   {
     icon: '📦',
