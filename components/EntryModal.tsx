@@ -47,10 +47,34 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       .single()
 
     if (dbError) {
-      setLoading(false)
       if (dbError.code === '23505') {
-        setError('CALLSIGN TAKEN')
+        // existing callsign — update country_code, keep arsenal intact
+        const { data: existing } = await supabase
+          .from('players')
+          .select('id, nickname, country_code')
+          .eq('nickname', callsign)
+          .single()
+        if (!existing) {
+          setLoading(false)
+          setError('SESSION NOT FOUND')
+          return
+        }
+        const { data: updated, error: updateError } = await supabase
+          .from('players')
+          .update({ country_code: countryCode })
+          .eq('id', existing.id)
+          .select('id, nickname, country_code')
+          .single()
+        setLoading(false)
+        if (updateError || !updated) {
+          setError('UPDATE FAILED')
+          return
+        }
+        const player: Player = { id: updated.id, nickname: updated.nickname, country_code: updated.country_code }
+        try { localStorage.setItem('ghostwar_player', JSON.stringify(player)) } catch { /* ignore */ }
+        onEnter(player)
       } else {
+        setLoading(false)
         setError(`CONNECTION FAILED: ${dbError.code}`)
       }
       return
@@ -189,7 +213,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-[#FF2233]/10 border border-[#FF2233] text-[#FF2233] text-sm tracking-[0.3em] hover:bg-[#FF2233]/20 active:bg-[#FF2233]/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed neon-border-pulse"
+              className="w-full py-3 bg-[#FF2233]/10 border border-[#FF2233] text-[#FF2233] text-sm tracking-[0.3em] hover:bg-[#FF2233]/20 active:bg-[#FF2233]/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed neon-border-pulse"
             >
               {loading ? '[ CONNECTING... ]' : '[ ENTER WAR ROOM ]'}
             </button>
