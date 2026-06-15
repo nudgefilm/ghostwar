@@ -133,7 +133,6 @@ export default function Home() {
   const processedMissileIdsRef = useRef<Set<string>>(new Set())
   const interceptedMissilesRef = useRef<Set<string>>(new Set())
   const launchedMissileIdsRef = useRef<Set<string>>(new Set())
-  const onImpactCallCountRef = useRef<Map<string, number>>(new Map())
   const impactSoundCountRef = useRef(0)
   const impactSoundResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const threatResolvedRef = useRef<Set<string>>(new Set())
@@ -281,7 +280,7 @@ export default function Home() {
   // ── Realtime callbacks ────────────────────────────────────────────────────
   const onMissile = useCallback(
     (missile: import('@/hooks/useRealtimeMissiles').MissileRow) => {
-      if (missile.target_country === player?.country_code) {
+      if (missile.target_country === player?.country_code && missile.launcher_country !== player?.country_code) {
         SoundEngine.init()
         SoundEngine.playAlert()
         setInterceptAlert(`⚠ INCOMING: ${missile.launcher_country} → ${missile.target_country}`)
@@ -792,15 +791,10 @@ export default function Home() {
             data.targetCountry === player?.country_code) ? 1.0 : 0.5
           const isOwnMissile = data.launcherCountry === player?.country_code
 
-          const _callIdx = (onImpactCallCountRef.current.get(data.missileId) ?? 0) + 1
-          onImpactCallCountRef.current.set(data.missileId, _callIdx)
-
-          // Judgment + API run once; sound fires on every staggered arrival
+          // Judgment + API run once; sound fires on every staggered arrival (own + non-own)
           if (processedMissileIdsRef.current.has(data.missileId)) {
             const _isIntercepted = interceptedMissilesRef.current.has(data.missileId)
-            const _willPlay = !isOwnMissile && !_isIntercepted && impactSoundCountRef.current <= 10
-            console.log(`[ONIMPACT-CALL] callIndex=${_callIdx} isOwnMissile=${isOwnMissile} isIntercepted=${_isIntercepted} soundCount=${impactSoundCountRef.current} willPlaySound=${_willPlay}`)
-            if (!isOwnMissile && !_isIntercepted) {
+            if (!_isIntercepted) {
               impactSoundCountRef.current++
               if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
               impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
@@ -809,11 +803,9 @@ export default function Home() {
             return
           }
           processedMissileIdsRef.current.add(data.missileId)
-          console.log(`[ONIMPACT-CALL] callIndex=${_callIdx} isOwnMissile=${isOwnMissile} isIntercepted=false soundCount=${impactSoundCountRef.current} willPlaySound=${!isOwnMissile} (FIRST)`)
           // Read defense state from ref — avoids stale closure when rAF fires before
           // React's useEffect syncs onImpactRef to the latest render's closure.
           const _def = defenseStateRef.current
-          console.log(`[IMPACT-FIRST] id=${data.missileId.slice(0,8)} isThreat=${_def.incomingThreats.some(t => t.id === data.missileId)} defenseReadiness=${_def.defenseReadiness}`)
 
           // ── Interception judgment (synchronous, no timer race) ────────────
           const threat = _def.incomingThreats.find(t => t.id === data.missileId)
@@ -874,15 +866,11 @@ export default function Home() {
             // Not intercepted: fall through to hit processing
           }
 
-          // ── Hit: play sound + call /api/impact ───────────────────────────
-          // Own outgoing missile: defer sound until API confirms intercept vs hit.
-          // Third-party missile: play immediately (no need to wait).
-          if (!isOwnMissile) {
-            impactSoundCountRef.current++
-            if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
-            impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
-            if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
-          }
+          // ── Hit: play sound immediately + call /api/impact ──────────────
+          impactSoundCountRef.current++
+          if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
+          impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
+          if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
 
           fetch('/api/impact', {
             method: 'POST',
@@ -901,23 +889,14 @@ export default function Home() {
             }) => {
               if (!result.success) return
 
-              // Attacker's own missile: visual for 1st + staggered sounds for all quantity
+              // Attacker's own missile: trigger 1st visual; impact sounds fired per-arrival in onImpact
               if (isOwnMissile) {
                 const coords = COUNTRY_COORDS[data.targetCountry as string]
                 if (result.was_intercepted) {
                   if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
+                  SoundEngine.playIntercept()
                 } else {
                   if (coords) globeRef.current?.triggerRedExplosionAt(coords[0], coords[1], data.type as 'missile' | 'nuke')
-                }
-                const qty = result.quantity ?? 1
-                for (let i = 0; i < Math.min(qty, 5); i++) {
-                  setTimeout(() => {
-                    if (result.was_intercepted) {
-                      SoundEngine.playIntercept()
-                    } else {
-                      SoundEngine.playImpact(soundVolume)
-                    }
-                  }, i * 200)
                 }
               }
 
