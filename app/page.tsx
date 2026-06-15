@@ -178,6 +178,8 @@ export default function Home() {
   const [nukeInterceptArmed, setNukeInterceptArmed] = useState(false)
   const [interceptNotif, setInterceptNotif] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
+  const [resetCountdown, setResetCountdown] = useState('--:--:--')
+  const [todayStr, setTodayStr] = useState('')
 
   // Stable ref for current defense state (used in setInterval closure)
   const defenseStateRef = useRef({
@@ -409,7 +411,7 @@ export default function Home() {
         .from('missiles')
         .select('target_country')
         .neq('status', 'flying')
-        .gte('created_at', todayStart.toISOString())
+        .gte('launched_at', todayStart.toISOString())
         .then(({ data }) => {
           if (!data || data.length === 0) { setTopTarget(null); return }
           const counts: Record<string, number> = {}
@@ -426,6 +428,22 @@ export default function Home() {
     return () => clearInterval(id)
   }, [])
 
+  // ── Client-only clock: resetCountdown + todayStr (avoids SSR/hydration mismatch) ──
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date()
+      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+      const ms = tomorrow.getTime() - now.getTime()
+      const hh = Math.floor(ms / 3_600_000)
+      const mm = Math.floor((ms % 3_600_000) / 60_000)
+      const ss = Math.floor((ms % 60_000) / 1_000)
+      setResetCountdown([hh, mm, ss].map(n => String(n).padStart(2, '0')).join(':'))
+      setTodayStr(now.toISOString().slice(0, 10))
+    }
+    tick()
+    const id = setInterval(tick, 1_000)
+    return () => clearInterval(id)
+  }, [])
 
   // ── Decrement online_users on tab close / navigation ─────────────────────
   useEffect(() => {
@@ -691,16 +709,6 @@ export default function Home() {
   const defconLevel = activeCount === 0 ? 5 : activeCount <= 3 ? 4 : activeCount <= 7 ? 3 : activeCount <= 15 ? 2 : 1
   const defconColor = ({ 5: '#00FFAA', 4: '#FFCC00', 3: '#FF8800', 2: '#FF4400', 1: '#FF2233' } as Record<number, string>)[defconLevel]
   const defconFilled = 6 - defconLevel  // DEFCON 1 → 5 bars lit, DEFCON 5 → 1 bar lit
-
-  // Daily reset countdown — recomputes every 500ms via existing tick
-  const _nowUtc = new Date()
-  const _tomorrowUtc = new Date(Date.UTC(_nowUtc.getUTCFullYear(), _nowUtc.getUTCMonth(), _nowUtc.getUTCDate() + 1))
-  const _msLeft = _tomorrowUtc.getTime() - _nowUtc.getTime()
-  const resetCountdown = [
-    Math.floor(_msLeft / 3600000),
-    Math.floor((_msLeft % 3600000) / 60000),
-    Math.floor((_msLeft % 60000) / 1000),
-  ].map(n => String(n).padStart(2, '0')).join(':')
 
   const onlineCountries = Object.values(countries)
     .filter(c => (c.online_users ?? 0) > 0)
@@ -1003,7 +1011,7 @@ export default function Home() {
         </div>
         <div className="flex-1 flex items-center justify-center overflow-hidden">
           <span className="text-zinc-200 text-[10px] tracking-wider whitespace-nowrap">
-            {new Date().toISOString().slice(0, 10)} │ {onlineCountries.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
+            {todayStr} │ {onlineCountries.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
           </span>
         </div>
         <div className="shrink-0 text-[10px] tracking-wider">
