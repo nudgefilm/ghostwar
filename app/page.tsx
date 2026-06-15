@@ -927,7 +927,7 @@ export default function Home() {
       {/* Top bar */}
       <header
         className="fixed top-0 left-0 right-0 z-20 h-10 flex items-center px-3 gap-4"
-        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(255,34,51,0.15)' }}
+        style={{ background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,34,51,0.15)' }}
       >
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
