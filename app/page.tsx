@@ -424,82 +424,6 @@ export default function Home() {
     return () => clearInterval(id)
   }, [])
 
-  // ── Defense countdown + interception resolution ────────────────────────────
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTick(t => t + 1)
-
-      const { incomingThreats, defenseReadiness, nukeInterceptArmed, nukes, player } =
-        defenseStateRef.current
-      if (incomingThreats.length === 0) return
-
-      const now = Date.now()
-      const toResolve: IncomingThreat[] = []
-
-      for (const t of incomingThreats) {
-        const remaining = (new Date(t.arrives_at).getTime() - now) / 1000
-        if (remaining <= 0 && !threatResolvedRef.current.has(t.id)) {
-          threatResolvedRef.current.add(t.id)
-          toResolve.push(t)
-        }
-      }
-
-      for (const threat of toResolve) {
-        let intercepted = false
-        let useNuke = false
-
-        if (threat.type === 'nuke') {
-          intercepted = nukeInterceptArmed && nukes > 0
-          useNuke = intercepted
-        } else {
-          intercepted = Math.random() < defenseReadiness / 100
-        }
-
-        if (intercepted) {
-          interceptedMissilesRef.current.add(threat.id)
-          globeRef.current?.markIntercepted(threat.id)
-
-          if (useNuke) setNukes(prev => Math.max(0, prev - 1))
-
-          SoundEngine.init()
-          SoundEngine.playIntercept()
-          setInterceptNotif('🛡️ INTERCEPTED!')
-          setTimeout(() => setInterceptNotif(null), 2000)
-          pushEventRef.current(
-            `🛡 INTERCEPT SUCCESSFUL — ${threat.quantity} ${threat.type}(s) destroyed`,
-            'defense',
-          )
-
-          if (player) {
-            fetch('/api/intercept', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                missile_id: threat.id,
-                intercepted: true,
-                player_id: player.id,
-                player_nickname: player.nickname,
-                player_country_code: player.country_code,
-              }),
-            }).catch(() => {})
-          }
-        }
-        // Not intercepted: Globe's natural onImpact → /api/impact handles it
-      }
-
-      if (toResolve.length > 0) {
-        const resolvedIds = new Set(toResolve.map(t => t.id))
-        setIncomingThreats(prev => {
-          const remaining = prev.filter(t => !resolvedIds.has(t.id))
-          if (remaining.length === 0) setInterceptAlert(null)
-          return remaining
-        })
-        setDefenseReadiness(0)
-        setNukeInterceptArmed(false)
-      }
-    }, 500)
-    return () => clearInterval(timer)
-  }, [])  // stable: reads from defenseStateRef
 
   // ── Decrement online_users on tab close / navigation ─────────────────────
   useEffect(() => {
@@ -839,11 +763,63 @@ export default function Home() {
           setActiveCount(prev => Math.max(0, prev - 1))
 
           if (!data.missileId || !data.targetCountry) return
-          // Skip missiles that were intercepted (Globe already showed blue explosion)
-          if (interceptedMissilesRef.current.has(data.missileId)) return
 
-          // Play impact sound for each animation, capped at 5 per salvo so large
-          // volleys don't spam. Reset counter 800ms after the last impact in the batch.
+          // Process each missile exactly once — guards both judgment and API calls
+          if (processedMissileIdsRef.current.has(data.missileId)) return
+          processedMissileIdsRef.current.add(data.missileId)
+
+          // ── Interception judgment (synchronous, no timer race) ────────────
+          const threat = incomingThreats.find(t => t.id === data.missileId)
+          if (threat) {
+            let intercepted = false
+            let useNuke = false
+            if (threat.type === 'nuke') {
+              intercepted = nukeInterceptArmed && nukes > 0
+              useNuke = intercepted
+            } else {
+              intercepted = Math.random() < defenseReadiness / 100
+            }
+
+            // Clean up threat state regardless of outcome
+            setIncomingThreats(prev => {
+              const remaining = prev.filter(t => t.id !== data.missileId)
+              if (remaining.length === 0) setInterceptAlert(null)
+              return remaining
+            })
+            setDefenseReadiness(0)
+            setNukeInterceptArmed(false)
+
+            if (intercepted) {
+              interceptedMissilesRef.current.add(data.missileId)
+              const coords = COUNTRY_COORDS[data.targetCountry]
+              if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
+              if (useNuke) setNukes(prev => Math.max(0, prev - 1))
+              SoundEngine.playIntercept()
+              setInterceptNotif('🛡️ INTERCEPTED!')
+              setTimeout(() => setInterceptNotif(null), 2000)
+              pushEventRef.current(
+                `🛡 INTERCEPT SUCCESSFUL — ${threat.quantity} ${threat.type}(s) destroyed`,
+                'defense',
+              )
+              if (player) {
+                fetch('/api/intercept', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    missile_id: data.missileId,
+                    intercepted: true,
+                    player_id: player.id,
+                    player_nickname: player.nickname,
+                    player_country_code: player.country_code,
+                  }),
+                }).catch(() => {})
+              }
+              return
+            }
+            // Not intercepted: fall through to hit processing
+          }
+
+          // ── Hit: play sound + call /api/impact ───────────────────────────
           impactSoundCountRef.current++
           if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
           impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
@@ -851,10 +827,6 @@ export default function Home() {
             data.launcherCountry === player?.country_code ||
             data.targetCountry === player?.country_code) ? 1.0 : 0.5
           if (impactSoundCountRef.current <= 5) SoundEngine.playImpact(soundVolume)
-
-          // Deduplicate API call: only process once per missile_id across quantity > 1 animations
-          if (processedMissileIdsRef.current.has(data.missileId)) return
-          processedMissileIdsRef.current.add(data.missileId)
 
           fetch('/api/impact', {
             method: 'POST',

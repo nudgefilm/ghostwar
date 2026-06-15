@@ -75,6 +75,7 @@ export interface GlobeHandle {
     launcherCountry?: string,
   ) => void
   markIntercepted: (missileId: string) => void
+  triggerBlueExplosionAt: (lat: number, lng: number) => void
 }
 
 type AnimFn = () => boolean
@@ -926,6 +927,10 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
       }, 50)
 
       blueExplosionRef.current?.(interceptPos)
+    },
+
+    triggerBlueExplosionAt(lat: number, lng: number) {
+      blueExplosionRef.current?.(latLngToVec3(lat, lng))
     },
 
     launchMissile(fromLat, fromLng, toLat, toLng, quantity, type, duration = 5000, missileId?: string, targetCountry?: string, launcherCountry?: string) {
