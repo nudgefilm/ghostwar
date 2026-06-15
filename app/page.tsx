@@ -1234,13 +1234,14 @@ export default function Home() {
           <select
             value={targetCountry ?? ''}
             onChange={e => setTargetCountry(e.target.value || null)}
-            className="w-full bg-zinc-800/60 border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1.5 mb-2 focus:outline-none focus:border-zinc-500 cursor-pointer"
+            className="w-full border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1.5 mb-2 focus:outline-none focus:border-zinc-500 cursor-pointer"
+            style={{ background: '#0d0d0f' }}
           >
-            <option value="">── SELECT TARGET ──</option>
+            <option value="" style={{ background: '#0d0d0f' }}>── SELECT TARGET ──</option>
             {COUNTRIES.filter(c => c.code !== player?.country_code).map(c => {
               const destroyed = (countries[c.code]?.damage_percent ?? 0) >= 100
               return (
-                <option key={c.code} value={c.code} disabled={destroyed}>
+                <option key={c.code} value={c.code} disabled={destroyed} style={{ background: '#0d0d0f' }}>
                   {destroyed ? '💀' : c.flag} {c.name}{destroyed ? ' [DESTROYED]' : ''}
                 </option>
               )
