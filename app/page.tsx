@@ -96,7 +96,7 @@ function HofRow({
   }, [entries.length])
 
   if (entries.length === 0) {
-    return <div className="text-[10px] text-center" style={{ color: '#52525b' }}>{empty}</div>
+    return <div className="text-[10px] text-center" style={{ color: '#71717a' }}>{empty}</div>
   }
   const e = entries[Math.min(idx, entries.length - 1)]
   return (
@@ -839,8 +839,8 @@ export default function Home() {
               ['Contact', 'nudgefilm@gmail.com'],
             ] as [string, string][]).map(([label, value]) => (
               <div key={label}>
-                <div className="text-zinc-500 text-[9px] tracking-wider uppercase mb-0.5">{label}</div>
-                <div className="text-zinc-200 text-[10px]">{value}</div>
+                <div className="text-zinc-300 text-[10px] tracking-wider uppercase mb-0.5">{label}</div>
+                <div className="text-zinc-200 text-xs">{value}</div>
               </div>
             ))}
           </div>
@@ -850,7 +850,7 @@ export default function Home() {
       {/* Privacy Policy Modal */}
       {infoModal === 'privacy' && (
         <InfoModal title="PRIVACY POLICY" onClose={() => setInfoModal(null)}>
-          <div className="space-y-3 text-[10px] text-zinc-400 leading-relaxed">
+          <div className="space-y-3 text-xs text-zinc-200 leading-relaxed">
             <p>Global Ghost War collects minimal information necessary for gameplay:</p>
             <ul className="space-y-1 ml-2">
               <li>— Nickname (chosen by you, stored to identify your account)</li>
@@ -866,8 +866,8 @@ export default function Home() {
               </ul>
             </div>
             <p>Data is stored securely via Supabase and is used solely to provide game functionality (session persistence, leaderboards, real-time multiplayer features).</p>
-            <p>You may request account data deletion by contacting: <span className="text-zinc-300">nudgefilm@gmail.com</span></p>
-            <p className="text-zinc-600">Last updated: 2026-06-14</p>
+            <p>You may request account data deletion by contacting: <span className="text-zinc-100">nudgefilm@gmail.com</span></p>
+            <p className="text-zinc-400">Last updated: 2026-06-14</p>
           </div>
         </InfoModal>
       )}
@@ -875,7 +875,7 @@ export default function Home() {
       {/* Terms of Service Modal */}
       {infoModal === 'terms' && (
         <InfoModal title="TERMS OF SERVICE" onClose={() => setInfoModal(null)}>
-          <div className="space-y-3 text-[10px] text-zinc-400 leading-relaxed">
+          <div className="space-y-3 text-xs text-zinc-200 leading-relaxed">
             <p>Global Ghost War is a fictional, satirical strategy simulation game created for entertainment purposes only.</p>
             <ul className="space-y-1.5 ml-2">
               <li>— All nation representations, conflicts, and &quot;attacks&quot; depicted are part of a game mechanic and do not reflect real-world events, political positions, or endorsements.</li>
@@ -884,8 +884,8 @@ export default function Home() {
               <li>— This service is provided &quot;as is&quot; without warranties. The operator is not liable for service interruptions, data loss, or any damages arising from use of this game.</li>
               <li>— Game rules, mechanics, and features (see RULES OF ENGAGEMENT) may change at any time without prior notice.</li>
             </ul>
-            <p>For questions, contact: <span className="text-zinc-300">nudgefilm@gmail.com</span></p>
-            <p className="text-zinc-600">Last updated: 2026-06-14</p>
+            <p>For questions, contact: <span className="text-zinc-100">nudgefilm@gmail.com</span></p>
+            <p className="text-zinc-400">Last updated: 2026-06-14</p>
           </div>
         </InfoModal>
       )}
@@ -909,10 +909,10 @@ export default function Home() {
       >
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
-          <span className="text-zinc-400 text-[10px]">// GLOBAL WARFARE SIM</span>
+          <span className="text-zinc-300 text-[10px]">// GLOBAL WARFARE SIM</span>
         </div>
         <div className="flex-1 flex items-center justify-center overflow-hidden">
-          <span className="text-zinc-300 text-[10px] tracking-wider whitespace-nowrap">
+          <span className="text-zinc-200 text-[10px] tracking-wider whitespace-nowrap">
             {new Date().toISOString().slice(0, 10)} │ {onlineNations.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
           </span>
         </div>
@@ -920,13 +920,13 @@ export default function Home() {
           {player ? (
             <div ref={dropdownRef} className="relative">
               <div
-                className="flex items-center gap-1.5 cursor-pointer text-zinc-300 hover:text-white transition-colors select-none"
+                className="flex items-center gap-1.5 cursor-pointer text-zinc-200 hover:text-white transition-colors select-none"
                 onClick={() => setDropdownOpen(p => !p)}
                 onMouseEnter={() => setDropdownOpen(true)}
               >
                 <TwemojiFlag code={player.country_code} size={14} />
                 <span>{player.nickname}</span>
-                <span className="text-zinc-400 text-[9px]">▾</span>
+                <span className="text-zinc-300 text-[9px]">▾</span>
               </div>
               {dropdownOpen && (
                 <div
@@ -936,14 +936,14 @@ export default function Home() {
                 >
                   <button
                     onClick={() => { setShowRules(true); setDropdownOpen(false) }}
-                    className="w-full text-left px-3 py-2 text-[10px] tracking-widest text-zinc-300 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                    className="w-full text-left px-3 py-2 text-[10px] tracking-widest text-zinc-200 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
                   >
                     ❓ RULES
                   </button>
                   <div className="border-t mx-2" style={{ borderColor: 'rgba(255,255,255,0.08)' }} />
                   <button
                     onClick={handleLogout}
-                    className="w-full text-left px-3 py-2 text-[10px] tracking-widest text-zinc-300 hover:text-[#FF2233] hover:bg-[#FF2233]/5 transition-colors cursor-pointer"
+                    className="w-full text-left px-3 py-2 text-[10px] tracking-widest text-zinc-200 hover:text-[#FF2233] hover:bg-[#FF2233]/5 transition-colors cursor-pointer"
                   >
                     🚪 LOGOUT
                   </button>
@@ -951,7 +951,7 @@ export default function Home() {
               )}
             </div>
           ) : (
-            <span className="text-zinc-400">UNIDENTIFIED</span>
+            <span className="text-zinc-300">UNIDENTIFIED</span>
           )}
         </div>
       </header>
@@ -964,7 +964,7 @@ export default function Home() {
 
         {/* OPERATOR */}
         <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-400 text-[10px] tracking-widest mb-2">OPERATOR</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">OPERATOR</div>
           {player ? (
             <>
               <div className="flex items-center gap-2 mb-2">
@@ -975,11 +975,11 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex items-center gap-4 text-[10px]">
-                <span className="text-zinc-300">🚀 <span className="text-green-400 font-bold">{missiles}</span></span>
-                <span className="text-zinc-300">☢️ <span className="text-orange-400 font-bold">{nukes}</span></span>
+                <span className="text-zinc-200">🚀 <span className="text-green-400 font-bold">{missiles}</span></span>
+                <span className="text-zinc-200">☢️ <span className="text-orange-400 font-bold">{nukes}</span></span>
                 <button
                   onClick={() => { localStorage.removeItem('ghostwar_player'); setPlayer(null) }}
-                  className="ml-auto text-zinc-500 text-[10px] hover:text-zinc-400 transition-colors cursor-pointer"
+                  className="ml-auto text-zinc-400 text-[10px] hover:text-zinc-300 transition-colors cursor-pointer"
                 >
                   [EXIT]
                 </button>
@@ -994,20 +994,20 @@ export default function Home() {
               )}
             </>
           ) : (
-            <div className="text-zinc-500 text-[10px]">NOT AUTHENTICATED</div>
+            <div className="text-zinc-400 text-[10px]">NOT AUTHENTICATED</div>
           )}
         </div>
 
         {/* WEAPONS */}
         <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-400 text-[10px] tracking-widest mb-2">WEAPONS</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">WEAPONS</div>
           <div className="flex gap-2 mb-3">
             <button
               onClick={() => setWeaponType('missile')}
               className={`flex-1 py-1.5 text-[10px] tracking-widest border transition-colors cursor-pointer ${
                 weaponType === 'missile'
                   ? 'bg-red-950 border-red-800 text-red-300'
-                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-300 hover:border-zinc-600'
+                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-200 hover:border-zinc-600'
               }`}
             >
               🚀 MISSILE
@@ -1018,7 +1018,7 @@ export default function Home() {
               className={`flex-1 py-1.5 text-[10px] tracking-widest border transition-colors ${
                 weaponType === 'nuke'
                   ? 'bg-orange-950 border-orange-700 text-orange-300'
-                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-400 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                  : 'bg-zinc-800/60 border-zinc-700 text-zinc-300 hover:border-zinc-600 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
               }`}
             >
               ☢️ NUKE
@@ -1032,7 +1032,7 @@ export default function Home() {
             onChange={e => setQuantity(Number(e.target.value))}
             className="w-full mb-2 accent-red-600"
           />
-          <div className="text-zinc-300 text-[10px] text-center tracking-widest">
+          <div className="text-zinc-200 text-[10px] text-center tracking-widest">
             <span className="text-white font-bold">{quantity}</span>
             {' × '}
             <span className={weaponType === 'nuke' ? 'text-orange-400' : 'text-red-400'}>
@@ -1043,11 +1043,11 @@ export default function Home() {
 
         {/* TARGET */}
         <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-400 text-[10px] tracking-widest mb-2">TARGET</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">TARGET</div>
           <select
             value={targetCountry ?? ''}
             onChange={e => setTargetCountry(e.target.value || null)}
-            className="w-full bg-zinc-800/60 border border-zinc-700 text-zinc-300 text-[10px] px-2 py-1.5 mb-2 focus:outline-none focus:border-zinc-500 cursor-pointer"
+            className="w-full bg-zinc-800/60 border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1.5 mb-2 focus:outline-none focus:border-zinc-500 cursor-pointer"
           >
             <option value="">── SELECT TARGET ──</option>
             {COUNTRIES.filter(c => c.code !== player?.country_code).map(c => {
@@ -1066,7 +1066,7 @@ export default function Home() {
             </div>
           )}
           {targetCountry && player && (
-            <div className="text-zinc-300 text-xs">
+            <div className="text-zinc-200 text-xs">
               ETA{' '}
               <span className="text-zinc-200 text-sm">
                 {Math.round(
@@ -1121,7 +1121,7 @@ export default function Home() {
                   className={`w-full py-1.5 mb-2 text-[10px] tracking-widest border transition-colors cursor-pointer ${
                     nukeInterceptArmed
                       ? 'bg-orange-900/60 border-orange-600 text-orange-300'
-                      : 'bg-zinc-800/60 border-zinc-600 text-zinc-300 hover:border-orange-700'
+                      : 'bg-zinc-800/60 border-zinc-600 text-zinc-200 hover:border-orange-700'
                   }`}
                 >
                   {nukeInterceptArmed ? '☢️ NUKE ARMED ✓' : '🛡️ USE NUKE TO INTERCEPT'}
@@ -1129,7 +1129,7 @@ export default function Home() {
               ) : (
                 <button
                   disabled
-                  className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-500 text-[10px] tracking-widest opacity-40 cursor-not-allowed"
+                  className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-400 text-[10px] tracking-widest opacity-40 cursor-not-allowed"
                 >
                   ☢️ NO NUKES AVAILABLE
                 </button>
@@ -1156,10 +1156,10 @@ export default function Home() {
           </div>
         ) : (
           <div className="pointer-events-auto p-3" style={CARD}>
-            <div className="text-zinc-400 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
+            <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
             <button
               disabled
-              className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-400 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
+              className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-300 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
             >
               🛡️ INTERCEPT
             </button>
@@ -1167,7 +1167,7 @@ export default function Home() {
               <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
                 <div className="h-full bg-zinc-600" style={{ width: '0%' }} />
               </div>
-              <span className="text-zinc-500 text-[10px]">0%</span>
+              <span className="text-zinc-400 text-[10px]">0%</span>
             </div>
           </div>
         )}
@@ -1175,7 +1175,7 @@ export default function Home() {
         {/* ALLIANCES — only shown when logged in */}
         {player && (
           <div className="pointer-events-auto p-3" style={{ ...CARD, borderColor: 'rgba(0,255,170,0.22)' }}>
-            <div className="text-zinc-400 text-[10px] tracking-widest mb-2">ALLIANCES</div>
+            <div className="text-zinc-300 text-[10px] tracking-widest mb-2">ALLIANCES</div>
 
             {/* Pending incoming requests */}
             {pendingIncoming.map(a => {
@@ -1212,7 +1212,7 @@ export default function Home() {
                       <span className="text-[#00FFAA] text-[9px] ml-0.5">{strength}%</span>
                       <button
                         onClick={() => handleAllianceBreak(a.country_a, a.country_b)}
-                        className="ml-auto text-zinc-600 text-[9px] hover:text-[#FF2233] transition-colors cursor-pointer shrink-0"
+                        className="ml-auto text-zinc-500 text-[9px] hover:text-[#FF2233] transition-colors cursor-pointer shrink-0"
                       >
                         [BREAK]
                       </button>
@@ -1223,7 +1223,7 @@ export default function Home() {
             )}
 
             {activeAlliances.length === 0 && pendingIncoming.length === 0 && (
-              <div className="text-zinc-400 text-[10px] mb-2">No active alliances</div>
+              <div className="text-zinc-300 text-[10px] mb-2">No active alliances</div>
             )}
 
             {/* Request a new alliance */}
@@ -1260,7 +1260,7 @@ export default function Home() {
                   </button>
                   <button
                     onClick={() => { setShowAllianceDropdown(false); setAllianceTarget('') }}
-                    className="px-2 py-1 text-[10px] border border-zinc-700 text-zinc-400 hover:text-zinc-300 transition-colors cursor-pointer"
+                    className="px-2 py-1 text-[10px] border border-zinc-700 text-zinc-300 hover:text-zinc-200 transition-colors cursor-pointer"
                   >
                     ✕
                   </button>
@@ -1277,9 +1277,9 @@ export default function Home() {
 
         {/* LIVE STRIKES — 3-item real-time ticker, older items fade */}
         <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-400 text-[10px] tracking-widest mb-2">LIVE STRIKES</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">LIVE STRIKES</div>
           {recentStrikes.length === 0 ? (
-            <div className="text-zinc-400 text-[10px]">Awaiting first strike...</div>
+            <div className="text-zinc-300 text-[10px]">Awaiting first strike...</div>
           ) : (
             <div className="flex flex-col gap-1">
               {recentStrikes.map((item, i) => {
@@ -1308,9 +1308,9 @@ export default function Home() {
 
         {/* ONLINE NATIONS — scrolling flag strip */}
         <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-400 text-[10px] tracking-widest mb-2">ONLINE NATIONS</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">ONLINE NATIONS</div>
           {onlineCountries.length === 0 ? (
-            <div className="text-zinc-400 text-[10px]">No active operators</div>
+            <div className="text-zinc-300 text-[10px]">No active operators</div>
           ) : onlineCountries.length > 5 ? (
             <div className="overflow-hidden h-7">
               <div className="flags-scroll flex gap-2 w-max">
@@ -1331,7 +1331,7 @@ export default function Home() {
         {/* HALL OF FAME — hidden when both rows are empty */}
         {hofEntries.length > 0 && (
           <div className="pointer-events-auto p-3" style={CARD}>
-            <div className="text-zinc-400 text-[10px] tracking-widest mb-2">HALL OF FAME</div>
+            <div className="text-zinc-300 text-[10px] tracking-widest mb-2">HALL OF FAME</div>
             <div className="space-y-1.5">
               <HofRow
                 entries={hofEntries.filter(e => e.action === 'nuke_launched')}
@@ -1354,9 +1354,9 @@ export default function Home() {
           className="pointer-events-auto p-3"
           style={CARD}
         >
-          <div className="text-zinc-400 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DAMAGE RANKINGS</div>
           {damagedRankings.length === 0 ? (
-            <div className="text-zinc-400 text-[10px]">No damage recorded</div>
+            <div className="text-zinc-300 text-[10px]">No damage recorded</div>
           ) : (
             <div className="space-y-2">
               {damagedRankings.map((c, i) => (
@@ -1368,7 +1368,7 @@ export default function Home() {
                   }}
                   className="w-full flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
                 >
-                  <span className="text-zinc-400 text-xs w-4 shrink-0">#{i + 1}</span>
+                  <span className="text-zinc-300 text-xs w-4 shrink-0">#{i + 1}</span>
                   <TwemojiFlag code={c.code} size={16} className="shrink-0" />
                   <span className="text-zinc-200 text-xs w-16 truncate shrink-0">{c.name}</span>
                   {c.damage_percent >= 100 ? (
@@ -1378,7 +1378,7 @@ export default function Home() {
                   ) : (
                     <DamageBar pct={c.damage_percent} />
                   )}
-                  <span className="text-zinc-300 text-[10px] w-9 text-right shrink-0">
+                  <span className="text-zinc-200 text-[10px] w-9 text-right shrink-0">
                     {c.damage_percent >= 100 ? '100%' : c.damage_percent > 0 ? `${Math.round(c.damage_percent)}%` : '< 1%'}
                   </span>
                 </button>
@@ -1389,7 +1389,7 @@ export default function Home() {
 
         {/* GLOBAL THREAT STATUS */}
         <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-400 text-[10px] tracking-widest mb-2">GLOBAL THREAT STATUS</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">GLOBAL THREAT STATUS</div>
           <div className="space-y-1.5">
             {/* DEFCON gauge */}
             <div className="flex items-center gap-2">
@@ -1416,7 +1416,7 @@ export default function Home() {
                 : '🕊 NO ACTIVE WARZONES'}
             </div>
             {/* Daily reset countdown */}
-            <div className="text-[10px] font-mono text-zinc-300">
+            <div className="text-[10px] font-mono text-zinc-200">
               ⏱ RESET IN {resetCountdown}
             </div>
           </div>
@@ -1424,7 +1424,7 @@ export default function Home() {
 
         {/* ARSENAL SUPPLY — redeem Gumroad codes */}
         <div className="pointer-events-auto p-3" style={CARD}>
-          <div className="text-zinc-400 text-[10px] tracking-widest mb-2">ARSENAL SUPPLY</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">ARSENAL SUPPLY</div>
           <div className="flex gap-1 mb-1.5">
             <input
               type="text"
@@ -1433,12 +1433,12 @@ export default function Home() {
               onKeyDown={e => e.key === 'Enter' && handleRedeem()}
               placeholder="ENTER CODE..."
               disabled={!player || isRedeeming}
-              className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1 font-mono tracking-wider placeholder:text-zinc-600 focus:outline-none focus:border-zinc-500 disabled:opacity-40"
+              className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1 font-mono tracking-wider placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 disabled:opacity-40"
             />
             <button
               onClick={handleRedeem}
               disabled={!player || !redeemCode.trim() || isRedeeming}
-              className="px-2 py-1 text-[10px] tracking-widest border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+              className="px-2 py-1 text-[10px] tracking-widest border border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
             >
               {isRedeeming ? '···' : 'REDEEM'}
             </button>
@@ -1453,12 +1453,12 @@ export default function Home() {
           )}
           <div className="flex gap-2 text-[9px]">
             <a href="https://nudgefilm.gumroad.com/l/tbyskm" target="_blank" rel="noopener noreferrer"
-              className="text-zinc-400 hover:text-zinc-300 transition-colors">
+              className="text-zinc-300 hover:text-zinc-200 transition-colors">
               Get Missiles ($5) ▸
             </a>
-            <span className="text-zinc-500">│</span>
+            <span className="text-zinc-400">│</span>
             <a href="https://nudgefilm.gumroad.com/l/nneaar" target="_blank" rel="noopener noreferrer"
-              className="text-zinc-400 hover:text-zinc-300 transition-colors">
+              className="text-zinc-300 hover:text-zinc-200 transition-colors">
               Get Bundle ($20) ▸
             </a>
           </div>
@@ -1470,15 +1470,15 @@ export default function Home() {
       <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-2 py-1.5 pointer-events-none"
         style={{ background: 'rgba(0,0,0,0.55)' }}
       >
-        <span className="text-[9px] text-zinc-600">© 2026 Ghost War</span>
-        <span className="text-[9px] text-zinc-600">│</span>
-        <button onClick={() => setInfoModal('operator')} className="text-[9px] text-zinc-600 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Operator Info</button>
-        <span className="text-[9px] text-zinc-600">│</span>
-        <button onClick={() => setInfoModal('privacy')} className="text-[9px] text-zinc-600 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Privacy</button>
-        <span className="text-[9px] text-zinc-600">│</span>
-        <button onClick={() => setInfoModal('terms')} className="text-[9px] text-zinc-600 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Terms</button>
-        <span className="text-[9px] text-zinc-600">│</span>
-        <a href="https://discord.gg/5QhFyQSPn4" target="_blank" rel="noopener noreferrer" className="text-[9px] text-zinc-600 hover:text-[#FF2233] transition-colors pointer-events-auto">Discord</a>
+        <span className="text-[9px] text-zinc-500">© 2026 Ghost War</span>
+        <span className="text-[9px] text-zinc-500">│</span>
+        <button onClick={() => setInfoModal('operator')} className="text-[9px] text-zinc-500 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Operator Info</button>
+        <span className="text-[9px] text-zinc-500">│</span>
+        <button onClick={() => setInfoModal('privacy')} className="text-[9px] text-zinc-500 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Privacy</button>
+        <span className="text-[9px] text-zinc-500">│</span>
+        <button onClick={() => setInfoModal('terms')} className="text-[9px] text-zinc-500 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Terms</button>
+        <span className="text-[9px] text-zinc-500">│</span>
+        <a href="https://discord.gg/5QhFyQSPn4" target="_blank" rel="noopener noreferrer" className="text-[9px] text-zinc-500 hover:text-[#FF2233] transition-colors pointer-events-auto">Discord</a>
       </footer>
     </div>
   )

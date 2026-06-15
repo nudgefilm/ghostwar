@@ -77,7 +77,7 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
         {/* ✕ close icon */}
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 z-10 text-sm text-zinc-500 hover:text-[#FF2233] transition-colors leading-none"
+          className="absolute top-2 right-2 z-10 text-base text-zinc-300 hover:text-[#FF2233] transition-colors leading-none"
         >
           ✕
         </button>
@@ -85,23 +85,23 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
         <div className="relative p-5">
           {/* Header */}
           <div className="text-center mb-4">
-            <div className="text-zinc-700 text-[9px] tracking-widest">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+            <div className="text-zinc-500 text-[10px] tracking-widest">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
             <div className="text-[#FF2233] text-sm font-bold tracking-[0.25em] my-1.5 neon-glow">
               BATTLE REPORT
             </div>
-            <div className="text-zinc-500 text-[10px] tracking-wider">
+            <div className="text-zinc-300 text-xs tracking-wider">
               {report.role === 'attacker'
                 ? `STRIKE CONFIRMED · TARGET: ${report.targetCountry}`
                 : `INCOMING STRIKE · FROM: ${report.launcherCountry}`}
             </div>
-            <div className="text-zinc-700 text-[9px] tracking-widest mt-1.5">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+            <div className="text-zinc-500 text-[10px] tracking-widest mt-1.5">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
           </div>
 
           {/* Stats */}
           <div className="space-y-2 mb-4">
             {rows.map(([label, value]) => (
               <div key={label} className="flex justify-between items-baseline gap-4">
-                <span className="text-zinc-500 text-[10px] tracking-wider shrink-0">{label}</span>
+                <span className="text-zinc-300 text-xs tracking-wider shrink-0">{label}</span>
                 <span className="text-zinc-100 text-[11px] font-bold tabular-nums text-right">{value}</span>
               </div>
             ))}
@@ -130,7 +130,7 @@ export default function BattleReportModal({ report, onClose, onRetaliate }: Prop
 
           {report.role === 'victim' && (
             <>
-              <div className="text-zinc-700 text-[9px] tracking-widest mb-4">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+              <div className="text-zinc-500 text-[10px] tracking-widest mb-4">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
               <button
                 onClick={() => onRetaliate(report.launcherCountry)}
                 className="w-full py-2 text-[10px] tracking-widest border border-[#FF2233]/60 hover:border-[#FF2233] hover:bg-[#FF2233]/10 transition-colors neon-glow"

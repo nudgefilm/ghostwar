@@ -41,11 +41,11 @@ export default function RulesModal({ onClose }: Props) {
         <div className="relative p-5">
           {/* Header */}
           <div className="text-center mb-4">
-            <div className="text-zinc-700 text-[9px] tracking-widest">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+            <div className="text-zinc-500 text-[10px] tracking-widest">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
             <div className="text-[#FF2233] text-sm font-bold tracking-[0.2em] my-1.5 neon-glow">
               RULES OF ENGAGEMENT
             </div>
-            <div className="text-zinc-700 text-[9px] tracking-widest">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+            <div className="text-zinc-500 text-[10px] tracking-widest">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
           </div>
 
           {/* Rules list — scrollable once it exceeds ~8 items */}
@@ -53,19 +53,19 @@ export default function RulesModal({ onClose }: Props) {
             {GAME_RULES.map(({ icon, title, text }) => (
               <div key={title} className="flex gap-2">
                 <span className="shrink-0 w-4">{icon}</span>
-                <span className="text-[10px] leading-relaxed">
+                <span className="text-xs leading-relaxed">
                   <span className="text-zinc-100 font-bold">{title}: </span>
-                  <span className="text-zinc-400">{text}</span>
+                  <span className="text-zinc-200">{text}</span>
                 </span>
               </div>
             ))}
           </div>
 
-          <div className="text-zinc-700 text-[9px] tracking-widest mb-4">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
+          <div className="text-zinc-500 text-[10px] tracking-widest mb-4">━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
 
           <button
             onClick={onClose}
-            className="w-full py-2.5 text-[10px] tracking-widest border border-[#FF2233]/60 hover:border-[#FF2233] hover:bg-[#FF2233]/10 text-zinc-200 hover:text-white transition-colors neon-glow cursor-pointer"
+            className="w-full py-2.5 text-xs tracking-widest border border-[#FF2233]/60 hover:border-[#FF2233] hover:bg-[#FF2233]/10 text-zinc-200 hover:text-white transition-colors neon-glow cursor-pointer"
           >
             [ UNDERSTOOD ]
           </button>
