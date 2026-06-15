@@ -144,7 +144,7 @@ export default function Home() {
   const [recentStrikes, setRecentStrikes] = useState<NewsFeedRow[]>([])
   const [countries, setCountries] = useState<Record<string, CountryRow>>({})
   const [damagedRankings, setDamagedRankings] = useState<{ code: string; name: string; flag: string; damage_percent: number }[]>([])
-  const [onlineNations, setOnlineNations] = useState<string[]>([])
+  // onlineNations는 countries state에서 파생 — Realtime 갱신 자동 반영
   const [isLaunching, setIsLaunching] = useState(false)
   const [interceptAlert, setInterceptAlert] = useState<string | null>(null)
   const [nukeReward, setNukeReward] = useState<number | null>(null)
@@ -192,19 +192,14 @@ export default function Home() {
     const loadCountries = async () => {
       const supabase = createClient()
       const todayUTC = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z'
-      const [{ data: countryData }, { data: playerData }, { count: todayStrikes }] = await Promise.all([
+      const [{ data: countryData }, { count: todayStrikes }] = await Promise.all([
         supabase.from('countries').select('code, name, flag, damage_stack, damage_percent, online_users'),
-        supabase.from('players').select('country_code'),
         supabase.from('missiles').select('*', { count: 'exact', head: true }).gte('launched_at', todayUTC),
       ])
       if (countryData) {
         const map: Record<string, CountryRow> = {}
         countryData.forEach(c => { map[c.code] = c as CountryRow })
         setCountries(map)
-      }
-      if (playerData) {
-        const codes = [...new Set(playerData.map(p => p.country_code as string))]
-        setOnlineNations(codes)
       }
       if (todayStrikes != null) setStrikeCount(todayStrikes)
     }
@@ -729,8 +724,9 @@ export default function Home() {
     Math.floor((_msLeft % 60000) / 1000),
   ].map(n => String(n).padStart(2, '0')).join(':')
 
-  const onlineCountries = onlineNations
-    .map(code => ({ code, flag: COUNTRY_FLAGS[code], name: COUNTRY_NAMES[code] }))
+  const onlineCountries = Object.values(countries)
+    .filter(c => (c.online_users ?? 0) > 0)
+    .map(c => ({ code: c.code, flag: COUNTRY_FLAGS[c.code] ?? c.flag, name: COUNTRY_NAMES[c.code] ?? c.name }))
     .filter(c => c.flag)
 
   const launchDisabled =
@@ -955,7 +951,7 @@ export default function Home() {
         </div>
         <div className="flex-1 flex items-center justify-center overflow-hidden">
           <span className="text-zinc-200 text-[10px] tracking-wider whitespace-nowrap">
-            {new Date().toISOString().slice(0, 10)} │ {onlineNations.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
+            {new Date().toISOString().slice(0, 10)} │ {onlineCountries.length} USERS │ ⚔ {strikeCount} STRIKES TODAY │ ☢ {nukeCount} NUKES │ 💥 {activeCount} ACTIVE
           </span>
         </div>
         <div className="shrink-0 text-[10px] tracking-wider">
