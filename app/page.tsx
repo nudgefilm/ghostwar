@@ -7,6 +7,7 @@ import EntryModal, { type Player } from '@/components/EntryModal'
 import TwemojiFlag from '@/components/TwemojiFlag'
 import BattleReportModal, { type BattleReportData } from '@/components/BattleReportModal'
 import RulesModal from '@/components/RulesModal'
+import TutorialModal from '@/components/TutorialModal'
 import InfoModal from '@/components/InfoModal'
 import { useRealtimeMissiles, type NewsFeedRow, type CountryRow } from '@/hooks/useRealtimeMissiles'
 import { createClient } from '@/lib/supabase/client'
@@ -154,6 +155,8 @@ export default function Home() {
   const [activeCount, setActiveCount] = useState(0)
   const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
   const [showRules, setShowRules] = useState(false)
+  const [showTutorial, setShowTutorial] = useState(false)
+  const [tutorialStep, setTutorialStep] = useState(0)
   const [redeemCode, setRedeemCode] = useState('')
   const [redeemStatus, setRedeemStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [isRedeeming, setIsRedeeming] = useState(false)
@@ -483,16 +486,34 @@ export default function Home() {
     return () => clearInterval(timer)
   }, [])  // stable: reads from defenseStateRef
 
+  const startTutorialHighlight = () => {
+    for (let i = 1; i <= 5; i++) {
+      setTimeout(() => setTutorialStep(i), (i - 1) * 1500)
+    }
+    setTimeout(() => setTutorialStep(0), 5 * 1500)
+  }
+
   const handleEnter = (p: Player) => {
     setPlayer(p)
     if (!localStorage.getItem('ghostwar_rules_seen')) {
       setShowRules(true)
+    } else if (!localStorage.getItem('hasSeenTutorial')) {
+      setShowTutorial(true)
     }
   }
 
   const handleRulesClose = () => {
     localStorage.setItem('ghostwar_rules_seen', 'true')
     setShowRules(false)
+    if (!localStorage.getItem('hasSeenTutorial')) {
+      setShowTutorial(true)
+    }
+  }
+
+  const handleTutorialClose = () => {
+    localStorage.setItem('hasSeenTutorial', 'true')
+    setShowTutorial(false)
+    startTutorialHighlight()
   }
 
   const handleLogout = () => {
@@ -826,6 +847,9 @@ export default function Home() {
       {/* Rules Modal */}
       {showRules && <RulesModal onClose={handleRulesClose} />}
 
+      {/* Tutorial Modal — first-time only */}
+      {showTutorial && <TutorialModal onClose={handleTutorialClose} />}
+
       {/* Operator Info Modal */}
       {infoModal === 'operator' && (
         <InfoModal title="OPERATOR INFORMATION" onClose={() => setInfoModal(null)}>
@@ -999,7 +1023,7 @@ export default function Home() {
         </div>
 
         {/* WEAPONS */}
-        <div className="pointer-events-auto p-3" style={CARD}>
+        <div className={`pointer-events-auto p-3${tutorialStep === 2 ? ' tutorial-highlight' : ''}`} style={CARD}>
           <div className="text-zinc-300 text-[10px] tracking-widest mb-2">WEAPONS</div>
           <div className="flex gap-2 mb-3">
             <button
@@ -1042,7 +1066,7 @@ export default function Home() {
         </div>
 
         {/* TARGET */}
-        <div className="pointer-events-auto p-3" style={CARD}>
+        <div className={`pointer-events-auto p-3${tutorialStep === 1 ? ' tutorial-highlight' : ''}`} style={CARD}>
           <div className="text-zinc-300 text-[10px] tracking-widest mb-2">TARGET</div>
           <select
             value={targetCountry ?? ''}
@@ -1093,7 +1117,7 @@ export default function Home() {
         </div>
 
         {/* LAUNCH */}
-        <div className="pointer-events-auto p-3" style={CARD}>
+        <div className={`pointer-events-auto p-3${tutorialStep === 3 ? ' tutorial-highlight' : ''}`} style={CARD}>
           <button
             onClick={handleLaunch}
             disabled={launchDisabled}
@@ -1106,7 +1130,7 @@ export default function Home() {
         {/* DEFENSE */}
         {primaryThreat ? (
           <div
-            className="pointer-events-auto p-3 animate-pulse"
+            className={`pointer-events-auto p-3 animate-pulse${tutorialStep === 4 ? ' tutorial-highlight' : ''}`}
             style={{ ...CARD, background: 'rgba(255,34,51,0.15)', borderColor: 'rgba(255,34,51,0.5)' }}
           >
             <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold">DEFENSE SYSTEMS</div>
@@ -1155,7 +1179,7 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          <div className="pointer-events-auto p-3" style={CARD}>
+          <div className={`pointer-events-auto p-3${tutorialStep === 4 ? ' tutorial-highlight' : ''}`} style={CARD}>
             <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
             <button
               disabled
@@ -1423,7 +1447,7 @@ export default function Home() {
         </div>
 
         {/* ARSENAL SUPPLY — redeem Gumroad codes */}
-        <div className="pointer-events-auto p-3" style={CARD}>
+        <div className={`pointer-events-auto p-3${tutorialStep === 5 ? ' tutorial-highlight' : ''}`} style={CARD}>
           <div className="text-zinc-300 text-[10px] tracking-widest mb-2">ARSENAL SUPPLY</div>
           <div className="flex gap-1 mb-1.5">
             <input
