@@ -56,6 +56,18 @@ export function useRealtimeMissiles({
   useEffect(() => {
     const supabase = createClient()
 
+    // Realtime: countries UPDATE (online_users, damage_percent 등 즉시 반영)
+    const countriesChannel = supabase
+      .channel('countries-changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'countries' },
+        (payload) => {
+          callbacksRef.current.onCountryUpdate(payload.new as CountryRow)
+        }
+      )
+      .subscribe()
+
     const poll = async () => {
       const since = lastPollTimeRef.current
       const now = new Date().toISOString()
@@ -91,6 +103,9 @@ export function useRealtimeMissiles({
 
     const interval = setInterval(poll, 1000)
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      supabase.removeChannel(countriesChannel)
+    }
   }, [])
 }

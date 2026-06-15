@@ -28,3 +28,6 @@ DROP TRIGGER IF EXISTS players_online_users_sync ON players;
 CREATE TRIGGER players_online_users_sync
   AFTER INSERT OR UPDATE OF country_code ON players
   FOR EACH ROW EXECUTE FUNCTION sync_players_online_users();
+
+-- Enable Realtime for countries table so clients receive UPDATE events instantly
+ALTER PUBLICATION supabase_realtime ADD TABLE countries;
