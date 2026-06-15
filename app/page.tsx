@@ -300,8 +300,10 @@ export default function Home() {
       }
 
       if (missile.launcher_country !== player?.country_code) {
+        console.log(`[LAUNCH-CHECK] id=${missile.id.slice(0,8)} alreadyLaunched=${launchedMissileIdsRef.current.has(missile.id)} setSize=${launchedMissileIdsRef.current.size}`)
         if (!launchedMissileIdsRef.current.has(missile.id)) {
           launchedMissileIdsRef.current.add(missile.id)
+          console.log(`[LAUNCH-FIRE] id=${missile.id.slice(0,8)} qty=${missile.quantity} type=${missile.type}`)
           const fromCoords = COUNTRY_COORDS[missile.launcher_country]
           const toCoords = COUNTRY_COORDS[missile.target_country]
           if (fromCoords && toCoords) {
@@ -635,6 +637,7 @@ export default function Home() {
         if (fromCoords && toCoords) {
           if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
           else SoundEngine.playLaunch()
+          console.log(`[LAUNCH-SELF] id=${data.missile_id?.slice(0,8)} qty=${quantity} type=${weaponType}`)
           globeRef.current?.launchMissile(
             fromCoords[0], fromCoords[1],
             toCoords[0], toCoords[1],
@@ -764,9 +767,11 @@ export default function Home() {
 
           if (!data.missileId || !data.targetCountry) return
 
+          console.log(`[IMPACT-CHECK] id=${data.missileId.slice(0,8)} alreadyProcessed=${processedMissileIdsRef.current.has(data.missileId)} type=${data.type}`)
           // Process each missile exactly once — guards both judgment and API calls
           if (processedMissileIdsRef.current.has(data.missileId)) return
           processedMissileIdsRef.current.add(data.missileId)
+          console.log(`[IMPACT-FIRST] id=${data.missileId.slice(0,8)} isThreat=${incomingThreats.some(t => t.id === data.missileId)} defenseReadiness=${defenseReadiness}`)
 
           // ── Interception judgment (synchronous, no timer race) ────────────
           const threat = incomingThreats.find(t => t.id === data.missileId)
