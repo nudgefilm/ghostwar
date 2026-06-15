@@ -1239,7 +1239,7 @@ export default function Home() {
               </div>
             )}
             <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold truncate">
-              ⚠️ WARNING: {primaryThreat.launcher_country}발 발사체 {primaryThreat.quantity}기 탐지. 도달까지 {primaryTimeRemaining}초
+              ⚠️ WARNING: {primaryThreat.quantity} INBOUND FROM {primaryThreat.launcher_country}
             </div>
             {primaryThreat.type === 'nuke' ? (
               nukes > 0 ? (
