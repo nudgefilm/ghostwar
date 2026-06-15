@@ -67,6 +67,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           .single()
         setLoading(false)
         if (updateError || !updated) {
+          console.log('[UPDATE ERROR]', updateError?.message, updateError?.code, updateError?.details, updateError?.hint)
           setError('UPDATE FAILED')
           return
         }
