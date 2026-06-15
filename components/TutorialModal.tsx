@@ -31,6 +31,11 @@ const STEPS: { icon: string; label: string; text: string }[] = [
     label: 'ARSENAL SUPPLY',
     text: 'Purchase missiles or the Strategic Pack (2 nukes + 500 missiles) via ARSENAL SUPPLY, then enter your code to redeem.',
   },
+  {
+    icon: '🌐',
+    label: 'SWITCHING NATIONS',
+    text: '[EXIT] returns you to nation select. Same callsign + new nation → your arsenal carries over. Different callsign → starts fresh.',
+  },
 ]
 
 export default function TutorialModal({ onClose }: { onClose: () => void }) {

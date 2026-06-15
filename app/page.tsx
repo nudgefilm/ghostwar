@@ -493,6 +493,17 @@ export default function Home() {
 
   const handleEnter = (p: Player) => {
     setPlayer(p)
+    createClient()
+      .from('players')
+      .select('missiles_remaining, nukes_remaining')
+      .eq('id', p.id)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          setMissiles(data.missiles_remaining)
+          setNukes(data.nukes_remaining)
+        }
+      })
     if (!localStorage.getItem('ghostwar_rules_seen')) {
       setShowRules(true)
     } else if (!localStorage.getItem('hasSeenTutorial')) {
@@ -517,6 +528,8 @@ export default function Home() {
   const handleLogout = () => {
     try { localStorage.removeItem('ghostwar_player') } catch { /* ignore */ }
     setPlayer(null)
+    setMissiles(0)
+    setNukes(0)
     setDropdownOpen(false)
   }
 
@@ -1000,7 +1013,7 @@ export default function Home() {
                 <span className="text-zinc-200">🚀 <span className="text-green-400 font-bold">{missiles}</span></span>
                 <span className="text-zinc-200">☢️ <span className="text-orange-400 font-bold">{nukes}</span></span>
                 <button
-                  onClick={() => { localStorage.removeItem('ghostwar_player'); setPlayer(null) }}
+                  onClick={handleLogout}
                   className="ml-auto text-zinc-400 text-[10px] hover:text-zinc-300 transition-colors cursor-pointer"
                 >
                   [EXIT]
