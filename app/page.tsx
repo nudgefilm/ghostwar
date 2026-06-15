@@ -941,6 +941,11 @@ export default function Home() {
       )}
 
       {/* Top bar */}
+      {/* Admin: 좌상단 모서리 클릭 → 별똥별 즉시 발동 */}
+      <div
+        className="fixed top-0 left-0 z-50 w-6 h-6 cursor-default"
+        onClick={() => window.dispatchEvent(new Event('ghostwar:shooting-star'))}
+      />
       <header
         className="fixed top-0 left-0 right-0 z-20 h-10 flex items-center px-3 gap-4"
         style={{ background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,34,51,0.15)' }}
@@ -1508,7 +1513,7 @@ export default function Home() {
       <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-2 py-1.5 pointer-events-none"
         style={{ background: 'rgba(0,0,0,0.4)' }}
       >
-        <span className="text-[9px] text-zinc-500">© 2026 Ghost War</span>
+        <span className="text-[9px] text-zinc-500 cursor-default select-none pointer-events-auto" onClick={() => window.dispatchEvent(new Event('ghostwar:shooting-star'))}>© 2026 Ghost War</span>
         <span className="text-[9px] text-zinc-500">│</span>
         <button onClick={() => setInfoModal('operator')} className="text-[9px] text-zinc-500 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Operator Info</button>
         <span className="text-[9px] text-zinc-500">│</span>

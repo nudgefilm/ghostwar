@@ -814,9 +814,13 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
     }
     const starInterval = setInterval(triggerShootingStar, 3600000)
 
+    const onManualStar = () => triggerShootingStar()
+    window.addEventListener('ghostwar:shooting-star', onManualStar)
+
     return () => {
       cancelAnimationFrame(animId)
       clearInterval(starInterval)
+      window.removeEventListener('ghostwar:shooting-star', onManualStar)
       window.removeEventListener('resize', onResize)
       controls.dispose()
       renderer.dispose()
