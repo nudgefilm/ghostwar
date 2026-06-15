@@ -810,7 +810,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
         const t = Math.min(elapsed / STAR_DUR, 1)
         const pulse      = 0.4 + 0.6 * (1 - Math.cos(2 * Math.PI * elapsed / 2000)) / 2  // 헤드만: 40%→100%→40% (2초 주기)
         const fadeOut    = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 3000))
-        const trailBright = 0.4 * fadeOut  // 꼬리: 40% — 가늘어 보이는 효과
+        const trailBright = 0.45 * fadeOut  // 꼬리: 45%
 
         const cur = new THREE.Vector3().lerpVectors(starStart, starEnd, t)
         headSprite.position.copy(cur)
