@@ -799,9 +799,6 @@ export default function Home() {
               if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
               impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
               if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
-              // Own missiles 2nd+ arrivals: re-suppress red explosion so API response controls the visual.
-              // onImpact fires BEFORE Globe's suppression check, so this is synchronous and reliable.
-              if (isOwnMissile && data.missileId) globeRef.current?.suppressExplosion(data.missileId)
             }
             return
           }
@@ -900,13 +897,7 @@ export default function Home() {
                   if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
                   SoundEngine.playIntercept()
                 } else {
-                  // All missiles were suppressed — replay red for each, staggered to match arrival cadence
-                  const qty = result.quantity ?? 1
-                  for (let i = 0; i < Math.min(qty, 5); i++) {
-                    setTimeout(() => {
-                      if (coords) globeRef.current?.triggerRedExplosionAt(coords[0], coords[1], data.type as 'missile' | 'nuke')
-                    }, i * 200)
-                  }
+                  if (coords) globeRef.current?.triggerRedExplosionAt(coords[0], coords[1], data.type as 'missile' | 'nuke')
                 }
               }
 
