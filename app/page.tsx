@@ -6,6 +6,7 @@ import type { GlobeHandle, ImpactData } from '@/components/Globe'
 import EntryModal, { type Player } from '@/components/EntryModal'
 import TwemojiFlag from '@/components/TwemojiFlag'
 import BattleReportModal, { type BattleReportData } from '@/components/BattleReportModal'
+import UnderAttackModal, { type UnderAttackData } from '@/components/UnderAttackModal'
 import RulesModal from '@/components/RulesModal'
 import TutorialModal from '@/components/TutorialModal'
 import InfoModal from '@/components/InfoModal'
@@ -153,6 +154,7 @@ export default function Home() {
   const [nukeCount, setNukeCount] = useState(0)
   const [activeCount, setActiveCount] = useState(0)
   const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
+  const [underAttackReport, setUnderAttackReport] = useState<UnderAttackData | null>(null)
   const [showRules, setShowRules] = useState(false)
   const [showTutorial, setShowTutorial] = useState(false)
   const [tutorialStep, setTutorialStep] = useState(0)
@@ -282,6 +284,8 @@ export default function Home() {
         SoundEngine.init()
         SoundEngine.playAlert()
         setInterceptAlert(`⚠ INCOMING: ${missile.launcher_country} → ${missile.target_country}`)
+        const homeCoords = COUNTRY_COORDS[player.country_code]
+        if (homeCoords) globeRef.current?.flyTo(homeCoords[0], homeCoords[1], 1200)
       }
 
       // Track incoming threats for interception
@@ -828,6 +832,14 @@ export default function Home() {
                   }),
                 }).catch(() => {})
               }
+              setTimeout(() => setUnderAttackReport({
+                launcherCountry: threat.launcher_country,
+                quantity: threat.quantity,
+                interceptedCount: threat.quantity,
+                prevDamagePercent: 0,
+                newDamagePercent: 0,
+                wasIntercepted: true,
+              }), 900)
               return
             }
             // Not intercepted: fall through to hit processing
@@ -899,6 +911,21 @@ export default function Home() {
 
               const qty = result.quantity ?? 1
               const type = result.type as 'missile' | 'nuke'
+
+              // Victim: show UnderAttackModal
+              if (isVictim) {
+                setUnderAttackReport({
+                  launcherCountry: result.launcher_country || data.launcherCountry || '',
+                  quantity: qty,
+                  interceptedCount: 0,
+                  prevDamagePercent: Math.round(result.prev_damage_percent),
+                  newDamagePercent: Math.round(result.new_damage_percent),
+                  wasIntercepted: false,
+                })
+                return
+              }
+
+              // Attacker: show BattleReportModal
               const infraDelta = !result.already_processed
                 ? result.new_damage_percent - result.prev_damage_percent
                 : null
@@ -908,7 +935,7 @@ export default function Home() {
                 : `$${ecoRaw}M`
 
               const reportPayload: BattleReportData = {
-                role: isAttacker ? 'attacker' : 'victim',
+                role: 'attacker',
                 targetCountry: data.targetCountry!,
                 launcherCountry: result.launcher_country || data.launcherCountry || '',
                 quantity: qty,
@@ -919,9 +946,9 @@ export default function Home() {
                 economicDamage,
                 oldRank: result.old_rank,
                 newRank: result.new_rank,
-                attacker_debuffed: !!isAttacker && (result.attacker_debuffed ?? false),
+                attacker_debuffed: result.attacker_debuffed ?? false,
                 targetDestroyed: !result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100,
-                alliance_reduction_percent: !!isAttacker && result.alliance_reduction > 0 ? result.alliance_reduction : undefined,
+                alliance_reduction_percent: result.alliance_reduction > 0 ? result.alliance_reduction : undefined,
               }
               // Nuke: wait for mushroom cloud; intercepted: wait for blue effect to clear
               const modalDelay = type === 'nuke' ? 5500 : result.was_intercepted ? 900 : 0
@@ -1002,7 +1029,7 @@ export default function Home() {
         </InfoModal>
       )}
 
-      {/* Battle Report Modal */}
+      {/* Battle Report Modal (attacker) */}
       {battleReport && (
         <BattleReportModal
           report={battleReport}
@@ -1010,6 +1037,18 @@ export default function Home() {
           onRetaliate={(country) => {
             setTargetCountry(country)
             setBattleReport(null)
+          }}
+        />
+      )}
+
+      {/* Under Attack Modal (victim — hit or successful defense) */}
+      {underAttackReport && (
+        <UnderAttackModal
+          report={underAttackReport}
+          onClose={() => setUnderAttackReport(null)}
+          onRetaliate={(country) => {
+            setTargetCountry(country)
+            setUnderAttackReport(null)
           }}
         />
       )}
