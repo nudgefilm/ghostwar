@@ -112,7 +112,7 @@ function HofRow({
 
 // ── Card wrapper style ────────────────────────────────────────────────────────
 const CARD: React.CSSProperties = {
-  background: 'rgba(0,0,0,0.8)',
+  background: 'rgba(0,0,0,0.6)',
   backdropFilter: 'blur(12px)',
   WebkitBackdropFilter: 'blur(12px)',
   border: '1px solid rgba(255,34,51,0.18)',
@@ -929,7 +929,7 @@ export default function Home() {
       {/* Top bar */}
       <header
         className="fixed top-0 left-0 right-0 z-20 h-10 flex items-center px-3 gap-4"
-        style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(255,34,51,0.15)' }}
+        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', borderBottom: '1px solid rgba(255,34,51,0.15)' }}
       >
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-[#FF2233] text-xs font-bold tracking-widest">GHOST WAR</span>
@@ -955,7 +955,7 @@ export default function Home() {
               {dropdownOpen && (
                 <div
                   className="absolute top-full right-0 mt-1 min-w-[130px] z-50"
-                  style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,34,51,0.2)' }}
+                  style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,34,51,0.2)' }}
                   onMouseLeave={() => setDropdownOpen(false)}
                 >
                   <button
@@ -1492,7 +1492,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-2 py-1.5 pointer-events-none"
-        style={{ background: 'rgba(0,0,0,0.55)' }}
+        style={{ background: 'rgba(0,0,0,0.4)' }}
       >
         <span className="text-[9px] text-zinc-500">© 2026 Ghost War</span>
         <span className="text-[9px] text-zinc-500">│</span>
