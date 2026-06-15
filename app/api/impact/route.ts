@@ -48,11 +48,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'DB_ERROR' }, { status: 500 })
   }
 
-  // Already processed by another client — return metadata for victim battle report
+  // Already processed by another client — check actual status to tell attacker if intercepted
   if (!updated || updated.length === 0) {
+    const { data: statusRow } = await supabase
+      .from('missiles')
+      .select('status')
+      .eq('id', missile_id as string)
+      .single()
     return NextResponse.json({
       success: true,
       already_processed: true,
+      was_intercepted: statusRow?.status === 'intercepted',
       launcher_id: missile.launcher_id,
       launcher_country: missile.launcher_country,
       quantity: missile.quantity,
@@ -144,6 +150,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     success: true,
     already_processed: false,
+    was_intercepted: false,
     launcher_id: missile.launcher_id,
     launcher_country: missile.launcher_country,
     quantity: missile.quantity,

@@ -833,13 +833,19 @@ export default function Home() {
           }
 
           // ── Hit: play sound + call /api/impact ───────────────────────────
-          impactSoundCountRef.current++
-          if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
-          impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
           const soundVolume = (data.type === 'nuke' ||
             data.launcherCountry === player?.country_code ||
             data.targetCountry === player?.country_code) ? 1.0 : 0.5
-          if (impactSoundCountRef.current <= 5) SoundEngine.playImpact(soundVolume)
+          const isOwnMissile = data.launcherCountry === player?.country_code
+
+          // Own outgoing missile: defer sound until API confirms intercept vs hit.
+          // Third-party missile: play immediately (no need to wait).
+          if (!isOwnMissile) {
+            impactSoundCountRef.current++
+            if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
+            impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
+            if (impactSoundCountRef.current <= 5) SoundEngine.playImpact(soundVolume)
+          }
 
           fetch('/api/impact', {
             method: 'POST',
@@ -848,7 +854,7 @@ export default function Home() {
           })
             .then(r => r.json())
             .then((result: {
-              success: boolean; already_processed: boolean
+              success: boolean; already_processed: boolean; was_intercepted: boolean
               launcher_id: string; launcher_country: string
               quantity: number; type: string
               attacker_debuffed: boolean
@@ -857,6 +863,17 @@ export default function Home() {
               old_rank: number | null; new_rank: number | null
             }) => {
               if (!result.success) return
+
+              // Attacker's own missile: now we know the outcome
+              if (isOwnMissile) {
+                if (result.was_intercepted) {
+                  SoundEngine.playIntercept()
+                  const coords = COUNTRY_COORDS[data.targetCountry as string]
+                  if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
+                } else {
+                  SoundEngine.playImpact(soundVolume)
+                }
+              }
 
               // Update DAMAGE RANKINGS from API response — no DB re-fetch, mirrors LIVE STRIKES pattern
               const targetCode = data.targetCountry as string
