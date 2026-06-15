@@ -48,30 +48,19 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
 
     if (dbError) {
       if (dbError.code === '23505') {
-        // existing callsign — update country_code, keep arsenal intact
-        const { data: existing } = await supabase
-          .from('players')
-          .select('id, nickname, country_code')
-          .eq('nickname', callsign)
-          .single()
-        if (!existing) {
-          setLoading(false)
-          setError('SESSION NOT FOUND')
-          return
-        }
-        const { data: updated, error: updateError } = await supabase
-          .from('players')
-          .update({ country_code: countryCode })
-          .eq('id', existing.id)
-          .select('id, nickname, country_code')
-          .single()
+        // existing callsign — update country_code server-side (admin key bypasses RLS)
+        const res = await fetch('/api/player/enter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nickname: callsign, country_code: countryCode }),
+        })
         setLoading(false)
-        if (updateError || !updated) {
-          console.log('[UPDATE ERROR]', updateError?.message, updateError?.code, updateError?.details, updateError?.hint)
-          setError('UPDATE FAILED')
+        const json = await res.json() as { success?: boolean; player?: { id: string; nickname: string; country_code: string }; error?: string }
+        if (!res.ok || !json.player) {
+          setError(json.error ?? 'UPDATE FAILED')
           return
         }
-        const player: Player = { id: updated.id, nickname: updated.nickname, country_code: updated.country_code }
+        const player: Player = { id: json.player.id, nickname: json.player.nickname, country_code: json.player.country_code }
         try { localStorage.setItem('ghostwar_player', JSON.stringify(player)) } catch { /* ignore */ }
         onEnter(player)
       } else {
