@@ -780,9 +780,22 @@ export default function Home() {
 
           if (!data.missileId || !data.targetCountry) return
 
+          const soundVolume = (data.type === 'nuke' ||
+            data.launcherCountry === player?.country_code ||
+            data.targetCountry === player?.country_code) ? 1.0 : 0.5
+          const isOwnMissile = data.launcherCountry === player?.country_code
+
           console.log(`[IMPACT-CHECK] id=${data.missileId.slice(0,8)} alreadyProcessed=${processedMissileIdsRef.current.has(data.missileId)} type=${data.type}`)
-          // Process each missile exactly once — guards both judgment and API calls
-          if (processedMissileIdsRef.current.has(data.missileId)) return
+          // Judgment + API run once; sound fires on every staggered arrival
+          if (processedMissileIdsRef.current.has(data.missileId)) {
+            if (!isOwnMissile && !interceptedMissilesRef.current.has(data.missileId)) {
+              impactSoundCountRef.current++
+              if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
+              impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
+              if (impactSoundCountRef.current <= 5) SoundEngine.playImpact(soundVolume)
+            }
+            return
+          }
           processedMissileIdsRef.current.add(data.missileId)
           console.log(`[IMPACT-FIRST] id=${data.missileId.slice(0,8)} isThreat=${incomingThreats.some(t => t.id === data.missileId)} defenseReadiness=${defenseReadiness}`)
 
@@ -846,11 +859,6 @@ export default function Home() {
           }
 
           // ── Hit: play sound + call /api/impact ───────────────────────────
-          const soundVolume = (data.type === 'nuke' ||
-            data.launcherCountry === player?.country_code ||
-            data.targetCountry === player?.country_code) ? 1.0 : 0.5
-          const isOwnMissile = data.launcherCountry === player?.country_code
-
           // Own outgoing missile: defer sound until API confirms intercept vs hit.
           // Third-party missile: play immediately (no need to wait).
           if (!isOwnMissile) {
