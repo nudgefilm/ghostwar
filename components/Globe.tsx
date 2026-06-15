@@ -121,6 +121,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
   const blueExplosionRef = useRef<((pos: THREE.Vector3) => void) | null>(null)
   const redExplosionRef = useRef<((pos: THREE.Vector3, type: 'missile' | 'nuke') => void) | null>(null)
   const suppressedExplosionsRef = useRef<Set<string>>(new Set())
+  const triggerCallCountRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     const mount = mountRef.current
@@ -552,6 +553,9 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
     }  // end doRedExplosionVisualAt
 
     const triggerExplosion = (m: MissileState) => {
+      const _cnt = (triggerCallCountRef.current.get(m.missileId ?? '') ?? 0) + 1
+      triggerCallCountRef.current.set(m.missileId ?? '', _cnt)
+      console.log(`[GLOBE-TRIGGER] id=${m.missileId?.slice(0,8)} call=${_cnt} suppressed=${m.missileId ? suppressedExplosionsRef.current.has(m.missileId) : false}`)
       onImpactRef.current?.({ missileId: m.missileId, targetCountry: m.targetCountry, launcherCountry: m.launcherCountry, type: m.type })
 
       // Trail cleanup always runs regardless of intercept suppression

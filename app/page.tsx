@@ -133,6 +133,7 @@ export default function Home() {
   const processedMissileIdsRef = useRef<Set<string>>(new Set())
   const interceptedMissilesRef = useRef<Set<string>>(new Set())
   const launchedMissileIdsRef = useRef<Set<string>>(new Set())
+  const onImpactCallCountRef = useRef<Map<string, number>>(new Map())
   const impactSoundCountRef = useRef(0)
   const impactSoundResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const threatResolvedRef = useRef<Set<string>>(new Set())
@@ -785,10 +786,15 @@ export default function Home() {
             data.targetCountry === player?.country_code) ? 1.0 : 0.5
           const isOwnMissile = data.launcherCountry === player?.country_code
 
-          console.log(`[IMPACT-CHECK] id=${data.missileId.slice(0,8)} alreadyProcessed=${processedMissileIdsRef.current.has(data.missileId)} type=${data.type}`)
+          const _callIdx = (onImpactCallCountRef.current.get(data.missileId) ?? 0) + 1
+          onImpactCallCountRef.current.set(data.missileId, _callIdx)
+
           // Judgment + API run once; sound fires on every staggered arrival
           if (processedMissileIdsRef.current.has(data.missileId)) {
-            if (!isOwnMissile && !interceptedMissilesRef.current.has(data.missileId)) {
+            const _isIntercepted = interceptedMissilesRef.current.has(data.missileId)
+            const _willPlay = !isOwnMissile && !_isIntercepted && impactSoundCountRef.current <= 5
+            console.log(`[ONIMPACT-CALL] callIndex=${_callIdx} isOwnMissile=${isOwnMissile} isIntercepted=${_isIntercepted} soundCount=${impactSoundCountRef.current} willPlaySound=${_willPlay}`)
+            if (!isOwnMissile && !_isIntercepted) {
               impactSoundCountRef.current++
               if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
               impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
@@ -797,6 +803,7 @@ export default function Home() {
             return
           }
           processedMissileIdsRef.current.add(data.missileId)
+          console.log(`[ONIMPACT-CALL] callIndex=${_callIdx} isOwnMissile=${isOwnMissile} isIntercepted=false soundCount=${impactSoundCountRef.current} willPlaySound=${!isOwnMissile} (FIRST)`)
           console.log(`[IMPACT-FIRST] id=${data.missileId.slice(0,8)} isThreat=${incomingThreats.some(t => t.id === data.missileId)} defenseReadiness=${defenseReadiness}`)
 
           // ── Interception judgment (synchronous, no timer race) ────────────
