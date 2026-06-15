@@ -808,9 +808,9 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact }, ref) => {
       const animStar = () => {
         const elapsed = performance.now() - starT0
         const t = Math.min(elapsed / STAR_DUR, 1)
-        const fadeIn  = 0.7 + 0.3 * Math.min(1, elapsed / 10000)  // 0.7→1.0, 10초에 걸쳐 서서히
+        const pulse   = 0.4 + 0.6 * (1 - Math.cos(2 * Math.PI * elapsed / 6000)) / 2  // 40%→100%→40% 반복 (6초 주기)
         const fadeOut = Math.max(0, Math.min(1, (STAR_DUR - elapsed) / 3000))
-        const brightness = fadeIn * fadeOut
+        const brightness = pulse * fadeOut
 
         const cur = new THREE.Vector3().lerpVectors(starStart, starEnd, t)
         headSprite.position.copy(cur)
