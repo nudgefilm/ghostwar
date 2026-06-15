@@ -76,6 +76,8 @@ export interface GlobeHandle {
   ) => void
   markIntercepted: (missileId: string) => void
   triggerBlueExplosionAt: (lat: number, lng: number) => void
+  suppressExplosion: (missileId: string) => void
+  triggerRedExplosionAt: (lat: number, lng: number, type?: 'missile' | 'nuke') => void
 }
 
 type AnimFn = () => boolean
@@ -117,6 +119,8 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
   const activeMissilesRef = useRef<MissileState[]>([])
   const freeSlotsRef = useRef<number[]>([])
   const blueExplosionRef = useRef<((pos: THREE.Vector3) => void) | null>(null)
+  const redExplosionRef = useRef<((pos: THREE.Vector3, type: 'missile' | 'nuke') => void) | null>(null)
+  const suppressedExplosionsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     const mount = mountRef.current
@@ -269,10 +273,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
     // ── Explosion trigger ────────────────────────────────────────────────
     const debrisColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFCC00, 0xFF2233]
 
-    const triggerExplosion = (m: MissileState) => {
-      const ip = m.impactPoint
-      onImpactRef.current?.({ missileId: m.missileId, targetCountry: m.targetCountry, launcherCountry: m.launcherCountry, type: m.type })
-
+    const doRedExplosionVisualAt = (ip: THREE.Vector3, type: 'missile' | 'nuke') => {
       // Shared radial-gradient sprite texture — reused by all soft-particle effects this explosion
       const smokeCanvas = document.createElement('canvas')
       smokeCanvas.width = 64; smokeCanvas.height = 64
@@ -418,37 +419,9 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
       }
       requestAnimationFrame(animScorch)
 
-      // Fade trail line over 2s
-      const trailT0 = performance.now()
-      const animTrail = () => {
-        const tp = Math.min((performance.now() - trailT0) / 2000, 1)
-        m.trailMat.opacity = 0.9 * (1 - tp)
-        if (tp < 1) requestAnimationFrame(animTrail)
-        else { scene.remove(m.trailLine); m.trailGeo.dispose(); m.trailMat.dispose() }
-      }
-      requestAnimationFrame(animTrail)
-
-      // Camera shake: nuke always shakes; missile only when player's country is involved
-      const pc = playerCountryRef.current
-      const playerInvolved = m.type === 'nuke' || m.launcherCountry === pc || m.targetCountry === pc
-      const cam = cameraRef.current
-      if (cam && playerInvolved) {
-        const origPos = cam.position.clone()
-        const shakeDur = m.type === 'nuke' ? 500 : 300
-        const shakeAmt = m.type === 'nuke' ? 0.15 : 0.08
-        const shakeEnd = Date.now() + shakeDur
-        const shake = () => {
-          if (Date.now() > shakeEnd) { cam.position.copy(origPos); return }
-          cam.position.x = origPos.x + (Math.random() - 0.5) * shakeAmt
-          cam.position.y = origPos.y + (Math.random() - 0.5) * shakeAmt
-          requestAnimationFrame(shake)
-        }
-        shake()
-      }
-
       // ── Mushroom cloud (nuke only) ──────────────────────────────────────
-      if (m.type === 'nuke') {
-        // impactNorm / tan / btan are already computed by the scorch mark section above
+      if (type === 'nuke') {
+        // impactNorm / tan / btan computed above in the scorch section
 
         // Extra bright white flash: intensity 10, 0.15s
         const nukeFlash = new THREE.PointLight(0xFFFFFF, 10, 2)
@@ -576,6 +549,46 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
           requestAnimationFrame(animCap)
         }, 1600)
       }
+    }  // end doRedExplosionVisualAt
+
+    const triggerExplosion = (m: MissileState) => {
+      onImpactRef.current?.({ missileId: m.missileId, targetCountry: m.targetCountry, launcherCountry: m.launcherCountry, type: m.type })
+
+      // Trail cleanup always runs regardless of intercept suppression
+      const trailT0 = performance.now()
+      const animTrail = () => {
+        const tp = Math.min((performance.now() - trailT0) / 2000, 1)
+        m.trailMat.opacity = 0.9 * (1 - tp)
+        if (tp < 1) requestAnimationFrame(animTrail)
+        else { scene.remove(m.trailLine); m.trailGeo.dispose(); m.trailMat.dispose() }
+      }
+      requestAnimationFrame(animTrail)
+
+      // Suppressed: attacker waiting for API response to decide red vs blue
+      if (m.missileId && suppressedExplosionsRef.current.has(m.missileId)) {
+        suppressedExplosionsRef.current.delete(m.missileId)
+        return
+      }
+
+      doRedExplosionVisualAt(m.impactPoint, m.type)
+
+      // Camera shake: nuke always; missile only when player's country involved
+      const pc = playerCountryRef.current
+      const playerInvolved = m.type === 'nuke' || m.launcherCountry === pc || m.targetCountry === pc
+      const cam = cameraRef.current
+      if (cam && playerInvolved) {
+        const origPos = cam.position.clone()
+        const shakeDur = m.type === 'nuke' ? 500 : 300
+        const shakeAmt = m.type === 'nuke' ? 0.15 : 0.08
+        const shakeEnd = Date.now() + shakeDur
+        const shake = () => {
+          if (Date.now() > shakeEnd) { cam.position.copy(origPos); return }
+          cam.position.x = origPos.x + (Math.random() - 0.5) * shakeAmt
+          cam.position.y = origPos.y + (Math.random() - 0.5) * shakeAmt
+          requestAnimationFrame(shake)
+        }
+        shake()
+      }
     }
 
     // ── Blue spark explosion (interception) ─────────────────────────────────
@@ -654,6 +667,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
       requestAnimationFrame(animSparks)
     }
     blueExplosionRef.current = triggerBlueExplosion
+    redExplosionRef.current = doRedExplosionVisualAt
 
     // Render loop
     let animId: number
@@ -931,6 +945,14 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
 
     triggerBlueExplosionAt(lat: number, lng: number) {
       blueExplosionRef.current?.(latLngToVec3(lat, lng))
+    },
+
+    suppressExplosion(missileId: string) {
+      suppressedExplosionsRef.current.add(missileId)
+    },
+
+    triggerRedExplosionAt(lat: number, lng: number, type: 'missile' | 'nuke' = 'missile') {
+      redExplosionRef.current?.(latLngToVec3(lat, lng), type)
     },
 
     launchMissile(fromLat, fromLng, toLat, toLng, quantity, type, duration = 5000, missileId?: string, targetCountry?: string, launcherCountry?: string) {

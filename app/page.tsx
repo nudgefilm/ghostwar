@@ -656,6 +656,7 @@ export default function Home() {
           if (weaponType === 'nuke') SoundEngine.playNukeLaunch()
           else SoundEngine.playLaunch()
           console.log(`[LAUNCH-SELF] id=${data.missile_id?.slice(0,8)} qty=${quantity} type=${weaponType}`)
+          if (data.missile_id) globeRef.current?.suppressExplosion(data.missile_id)
           globeRef.current?.launchMissile(
             fromCoords[0], fromCoords[1],
             toCoords[0], toCoords[1],
@@ -866,12 +867,13 @@ export default function Home() {
 
               // Attacker's own missile: now we know the outcome
               if (isOwnMissile) {
+                const coords = COUNTRY_COORDS[data.targetCountry as string]
                 if (result.was_intercepted) {
                   SoundEngine.playIntercept()
-                  const coords = COUNTRY_COORDS[data.targetCountry as string]
                   if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
                 } else {
                   SoundEngine.playImpact(soundVolume)
+                  if (coords) globeRef.current?.triggerRedExplosionAt(coords[0], coords[1], data.type as 'missile' | 'nuke')
                 }
               }
 
