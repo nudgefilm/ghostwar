@@ -120,7 +120,7 @@ export default function GlobalComms({ player }: Props) {
             <span className="text-[#00FFAA] shrink-0 font-bold truncate max-w-[72px]">
               {m.nickname}:
             </span>
-            <span className="text-zinc-300 break-words min-w-0">{m.message}</span>
+            <span className="text-zinc-300 break-all min-w-0">{m.message}</span>
           </div>
         ))}
         <div ref={bottomRef} />
