@@ -43,7 +43,7 @@ function ToastShell({
 }) {
   return (
     <div
-      className="fixed bottom-4 z-50 font-mono text-xs toast-slide-in"
+      className="fixed bottom-10 z-50 font-mono text-xs toast-slide-in"
       style={{
         right: 'calc(270px + 8px)',
         width: '280px',
