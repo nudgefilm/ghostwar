@@ -1666,7 +1666,31 @@ export default function Home() {
       <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-2 py-1.5 pointer-events-none"
         style={{ background: 'rgba(0,0,0,0.4)' }}
       >
-        <span className="text-[9px] text-zinc-500 cursor-pointer pointer-events-auto" onClick={() => window.dispatchEvent(new Event('ghostwar:shooting-star'))}>© 2026 Ghost War</span>
+        <span className="relative group pointer-events-auto">
+          <span className="text-[9px] text-zinc-500 cursor-pointer" onClick={() => window.dispatchEvent(new Event('ghostwar:shooting-star'))}>© 2026 Ghost War</span>
+          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none select-none">
+            <svg width="80" height="24" viewBox="0 0 80 24" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="sstar-hg" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="rgba(220,255,235,1)"/>
+                  <stop offset="15%" stopColor="rgba(0,255,136,1)"/>
+                  <stop offset="50%" stopColor="rgba(0,255,136,0.4)"/>
+                  <stop offset="100%" stopColor="rgba(0,255,136,0)"/>
+                </radialGradient>
+                <linearGradient id="sstar-tg" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="rgba(0,255,136,0)"/>
+                  <stop offset="100%" stopColor="rgba(0,255,136,0.5)"/>
+                </linearGradient>
+              </defs>
+              <line x1="12" y1="12" x2="76" y2="12" stroke="url(#sstar-tg)" strokeWidth="1.5"/>
+              <circle cx="12" cy="12" r="8" fill="url(#sstar-hg)"/>
+              <line x1="12" y1="4" x2="12" y2="20" stroke="rgba(0,255,136,0.85)" strokeWidth="0.8"/>
+              <line x1="4" y1="12" x2="20" y2="12" stroke="rgba(0,255,136,0.85)" strokeWidth="0.8"/>
+              <line x1="6" y1="6" x2="18" y2="18" stroke="rgba(0,255,136,0.85)" strokeWidth="0.6"/>
+              <line x1="18" y1="6" x2="6" y2="18" stroke="rgba(0,255,136,0.85)" strokeWidth="0.6"/>
+            </svg>
+          </span>
+        </span>
         <span className="text-[9px] text-zinc-500">│</span>
         <button onClick={() => setInfoModal('operator')} className="text-[9px] text-zinc-500 hover:text-[#FF2233] transition-colors pointer-events-auto cursor-pointer">Operator Info</button>
         <span className="text-[9px] text-zinc-500">│</span>
