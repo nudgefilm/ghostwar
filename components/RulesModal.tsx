@@ -2,7 +2,7 @@
 
 // Last updated: 2026-06-14
 const GAME_RULES: { icon: string; title: string; text: string }[] = [
-  { icon: '🚀', title: 'MISSILES',      text: '100 free daily (00:00 UTC / 09:00 KST)' },
+  { icon: '🚀', title: 'MISSILES',      text: '20 free daily (00:00 UTC / 09:00 KST)' },
   { icon: '☢',  title: 'NUKES',         text: 'Earn 1 nuke per 1,000 missiles fired' },
   { icon: '💥', title: 'DAMAGE',        text: 'Each hit accumulates. 10 weighted hits = +1% damage (nukes count as 50×)' },
   { icon: '☠',  title: 'SCORCHED EARTH', text: "At 100% damage, that nation's attacks are reduced 50% until recovery" },

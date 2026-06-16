@@ -14,7 +14,7 @@ CREATE TABLE players (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nickname text UNIQUE NOT NULL,
   country_code text REFERENCES countries(code),
-  missiles_remaining integer DEFAULT 100,
+  missiles_remaining integer DEFAULT 20,
   nukes_remaining integer DEFAULT 0,
   last_missile_reset date DEFAULT CURRENT_DATE,
   total_kills integer DEFAULT 0,

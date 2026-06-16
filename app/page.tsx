@@ -5,8 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { GlobeHandle, ImpactData } from '@/components/Globe'
 import EntryModal, { type Player } from '@/components/EntryModal'
 import TwemojiFlag from '@/components/TwemojiFlag'
-import BattleReportModal, { type BattleReportData } from '@/components/BattleReportModal'
-import UnderAttackModal, { type UnderAttackData } from '@/components/UnderAttackModal'
+import { BattleReportToast, UnderAttackToast, type BattleReportData, type UnderAttackData } from '@/components/CombatToast'
 import RulesModal from '@/components/RulesModal'
 import TutorialModal from '@/components/TutorialModal'
 import InfoModal from '@/components/InfoModal'
@@ -15,6 +14,7 @@ import { createClient } from '@/lib/supabase/client'
 import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/countries'
 import { SoundEngine } from '@/lib/sounds'
 import EventTicker, { useEventTicker } from '@/components/EventTicker'
+import GlobalComms from '@/components/GlobalComms'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Globe = dynamic(() => import('@/components/Globe'), { ssr: false }) as any
@@ -141,7 +141,7 @@ export default function Home() {
   const [targetCountry, setTargetCountry] = useState<string | null>(null)
   const [weaponType, setWeaponType] = useState<'missile' | 'nuke'>('missile')
   const [quantity, setQuantity] = useState(1)
-  const [missiles, setMissiles] = useState(100)
+  const [missiles, setMissiles] = useState(20)
   const [nukes, setNukes] = useState(0)
   const [recentStrikes, setRecentStrikes] = useState<NewsFeedRow[]>([])
   const [countries, setCountries] = useState<Record<string, CountryRow>>({})
@@ -155,6 +155,7 @@ export default function Home() {
   const [activeCount, setActiveCount] = useState(0)
   const [battleReport, setBattleReport] = useState<BattleReportData | null>(null)
   const [underAttackReport, setUnderAttackReport] = useState<UnderAttackData | null>(null)
+  const [dailyBrief, setDailyBrief] = useState<string | null>(null)
   const [showRules, setShowRules] = useState(false)
   const [showTutorial, setShowTutorial] = useState(false)
   const [tutorialStep, setTutorialStep] = useState(0)
@@ -198,9 +199,10 @@ export default function Home() {
     const loadCountries = async () => {
       const supabase = createClient()
       const todayUTC = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z'
-      const [{ data: countryData }, { count: todayStrikes }] = await Promise.all([
+      const [{ data: countryData }, { count: todayStrikes }, { data: briefRow }] = await Promise.all([
         supabase.from('countries').select('code, name, flag, damage_stack, damage_percent, online_users'),
         supabase.from('missiles').select('*', { count: 'exact', head: true }).gte('launched_at', todayUTC),
+        supabase.from('news_feed').select('content').eq('type', 'daily_brief').gte('created_at', todayUTC).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ])
       if (countryData) {
         const map: Record<string, CountryRow> = {}
@@ -208,6 +210,7 @@ export default function Home() {
         setCountries(map)
       }
       if (todayStrikes != null) setStrikeCount(todayStrikes)
+      if (briefRow?.content) setDailyBrief(briefRow.content)
     }
     loadCountries()
   }, [])
@@ -336,6 +339,10 @@ export default function Home() {
   )
 
   const onNews = useCallback((item: NewsFeedRow) => {
+    if (item.type === 'daily_brief') {
+      setDailyBrief(item.content)
+      return
+    }
     // Dedup by target_country: remove existing entry for this country, prepend new one, cap at 5
     setRecentStrikes(prev => [item, ...prev.filter(n => n.target_country !== item.target_country)].slice(0, 3))
     setStrikeCount(prev => prev + 1)
@@ -965,6 +972,9 @@ export default function Home() {
         }} />
       </div>
 
+      {/* Global Comms — bottom-left overlay on globe */}
+      <GlobalComms player={player} />
+
       {/* Rules Modal */}
       {showRules && <RulesModal onClose={handleRulesClose} />}
 
@@ -1035,9 +1045,9 @@ export default function Home() {
         </InfoModal>
       )}
 
-      {/* Battle Report Modal (attacker) */}
+      {/* Battle Report Toast (attacker) */}
       {battleReport && (
-        <BattleReportModal
+        <BattleReportToast
           report={battleReport}
           onClose={() => setBattleReport(null)}
           onRetaliate={(country) => {
@@ -1047,9 +1057,9 @@ export default function Home() {
         />
       )}
 
-      {/* Under Attack Modal (victim — hit or successful defense) */}
+      {/* Under Attack Toast (victim — hit or successful defense) */}
       {underAttackReport && (
-        <UnderAttackModal
+        <UnderAttackToast
           report={underAttackReport}
           onClose={() => setUnderAttackReport(null)}
           onRetaliate={(country) => {
@@ -1465,6 +1475,19 @@ export default function Home() {
 
       {/* ══ RIGHT PANEL ══ */}
       <aside className="fixed right-0 top-10 bottom-0 z-10 w-64 flex flex-col gap-2 p-2 pointer-events-none">
+
+        {/* DAILY BRIEF — pinned above LIVE STRIKES when available */}
+        {dailyBrief && (
+          <div
+            className="pointer-events-auto p-3"
+            style={{ ...CARD, borderColor: 'rgba(0,170,255,0.25)' }}
+          >
+            <div className="text-[#00AAFF] text-[10px] tracking-widest mb-1.5 font-bold">
+              📡 DAILY BRIEF
+            </div>
+            <p className="text-zinc-300 text-[10px] leading-[1.5]">{dailyBrief}</p>
+          </div>
+        )}
 
         {/* LIVE STRIKES — 3-item real-time ticker, older items fade */}
         <div className="pointer-events-auto p-3" style={CARD}>

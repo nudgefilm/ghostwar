@@ -9,7 +9,7 @@ const STEPS: { icon: string; label: string; text: string }[] = [
   {
     icon: '⚔️',
     label: 'SELECT WEAPON',
-    text: 'MISSILE is always available (100/day). NUKE activates only when you own one — earn by firing 1,000 missiles or purchase via ARSENAL SUPPLY.',
+    text: 'MISSILE is always available (20/day). NUKE activates only when you own one — earn by firing 1,000 missiles or purchase via ARSENAL SUPPLY.',
   },
   {
     icon: '🔴',
@@ -19,7 +19,7 @@ const STEPS: { icon: string; label: string; text: string }[] = [
   {
     icon: '🔄',
     label: 'DAILY RESUPPLY',
-    text: '100 missiles reload every day at 00:00 UTC (09:00 KST). Damaged nations also recover 10% daily.',
+    text: '20 missiles reload every day at 00:00 UTC (09:00 KST). Damaged nations also recover 10% daily.',
   },
   {
     icon: '🛡️',
