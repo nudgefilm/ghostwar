@@ -86,8 +86,9 @@ export default function GlobalComms({ player }: Props) {
 
   return (
     <div
-      className="fixed bottom-10 left-4 z-10 flex flex-col pointer-events-auto font-mono"
+      className="fixed bottom-10 z-10 flex flex-col pointer-events-auto font-mono"
       style={{
+        left: 'calc(16rem + 12px)',
         width: '280px',
         background: 'rgba(0,0,0,0.3)',
         border: '1px solid rgba(0,255,170,0.35)',
