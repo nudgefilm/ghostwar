@@ -16,7 +16,7 @@ interface ChatMessage {
 const MAX_MESSAGES = 20
 const MAX_CHARS = 100
 const COLLAPSED_ROWS = 1
-const EXPANDED_ROWS = 5
+const EXPANDED_ROWS = 10
 
 interface Props {
   player: Player | null
@@ -29,6 +29,8 @@ export default function GlobalComms({ player }: Props) {
   const [expanded, setExpanded] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  // Tracks outgoing messages to dedup when Realtime echoes them back
+  const pendingRef = useRef<Set<string>>(new Set())
 
   // Initial fetch — last 24h messages, capped at MAX_MESSAGES
   useEffect(() => {
@@ -45,7 +47,7 @@ export default function GlobalComms({ player }: Props) {
       })
   }, [])
 
-  // Realtime subscription — INSERT only
+  // Realtime subscription — dedup own optimistic messages
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
@@ -54,7 +56,23 @@ export default function GlobalComms({ player }: Props) {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as ChatMessage].slice(-MAX_MESSAGES))
+          const incoming = payload.new as ChatMessage
+          const key = `${incoming.nickname}:${incoming.message}`
+          if (pendingRef.current.has(key)) {
+            // Own message echoed back — replace optimistic entry with real one
+            pendingRef.current.delete(key)
+            setMessages(prev =>
+              prev.map(m =>
+                m.id.startsWith('opt-') &&
+                m.nickname === incoming.nickname &&
+                m.message === incoming.message
+                  ? incoming
+                  : m,
+              ).slice(-MAX_MESSAGES),
+            )
+          } else {
+            setMessages(prev => [...prev, incoming].slice(-MAX_MESSAGES))
+          }
         },
       )
       .subscribe()
@@ -72,10 +90,22 @@ export default function GlobalComms({ player }: Props) {
   const send = async () => {
     if (!player || !input.trim() || sending) return
     const msg = input.trim()
+    const key = `${player.nickname}:${msg}`
+
+    // Optimistic update — visible immediately
+    pendingRef.current.add(key)
+    setMessages(prev => [...prev, {
+      id: `opt-${Date.now()}`,
+      nickname: player.nickname,
+      country_code: player.country_code,
+      message: msg,
+      created_at: new Date().toISOString(),
+    }].slice(-MAX_MESSAGES))
+
     setInput('')
+    inputRef.current?.focus()  // synchronous — input not disabled during send
     setSending(true)
-    // Restore focus after state update
-    setTimeout(() => inputRef.current?.focus(), 0)
+
     try {
       await fetch('/api/chat/send', {
         method: 'POST',
@@ -89,18 +119,17 @@ export default function GlobalComms({ player }: Props) {
       })
     } finally {
       setSending(false)
-      setTimeout(() => inputRef.current?.focus(), 0)
     }
   }
 
   // Visible messages: last N rows depending on expanded state
   const visibleMessages = messages.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
 
-  // Row height ≈ 18px (text-[10px] leading-snug), padding 8px top+bottom
-  const ROW_H = 18
+  // Row height ≈ 18px (text-[10px] leading-snug) + 6px gap, plus 16px padding
+  const ROW_H = 18 + 6
   const listHeight = visibleMessages.length === 0
-    ? ROW_H
-    : visibleMessages.length * ROW_H
+    ? 18
+    : visibleMessages.length * ROW_H - 6  // last row has no trailing gap
 
   return (
     <div
@@ -135,7 +164,7 @@ export default function GlobalComms({ player }: Props) {
       {/* Messages — height transitions smoothly */}
       <div
         ref={listRef}
-        className="overflow-hidden px-2.5 py-2 space-y-1.5"
+        className="px-2.5 py-2 space-y-1.5"
         style={{
           height: `${listHeight + 16}px`,
           transition: 'height 0.22s ease',
@@ -152,7 +181,12 @@ export default function GlobalComms({ player }: Props) {
             <span className="text-[#00FFAA] shrink-0 font-bold truncate max-w-[72px]">
               {m.nickname}:
             </span>
-            <span className="text-zinc-300 break-all min-w-0">{m.message}</span>
+            <span
+              className="break-all min-w-0"
+              style={{ color: m.id.startsWith('opt-') ? 'rgba(212,212,216,0.55)' : '#d4d4d8' }}
+            >
+              {m.message}
+            </span>
           </div>
         ))}
       </div>
@@ -173,13 +207,13 @@ export default function GlobalComms({ player }: Props) {
               send()
             }
           }}
-          disabled={!player || sending}
+          disabled={!player}
           placeholder={player ? 'Send a message…' : 'Select a nation to join comms'}
           maxLength={MAX_CHARS}
           className="flex-1 min-w-0 bg-transparent text-[10px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-40"
         />
         <button
-          onClick={() => { send(); setTimeout(() => inputRef.current?.focus(), 0) }}
+          onClick={send}
           disabled={!player || !input.trim() || sending}
           className="text-[10px] tracking-wider disabled:opacity-30 hover:text-white transition-colors cursor-pointer shrink-0"
           style={{ color: '#00FFAA' }}
