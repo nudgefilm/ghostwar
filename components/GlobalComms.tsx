@@ -92,7 +92,6 @@ export default function GlobalComms({ player }: Props) {
         width: '280px',
         background: 'rgba(0,0,0,0.3)',
         border: '1px solid rgba(0,255,170,0.35)',
-        backdropFilter: 'blur(8px)',
       }}
     >
       {/* Header */}

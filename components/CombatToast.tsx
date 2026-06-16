@@ -47,10 +47,9 @@ function ToastShell({
       style={{
         right: 'calc(270px + 8px)',
         width: '280px',
-        background: 'rgba(4,4,6,0.96)',
+        background: 'rgba(0,0,0,0.3)',
         border: `1px solid ${borderColor}`,
-        boxShadow: `0 0 18px ${glowColor}, inset 0 0 12px ${glowColor.replace('0.35', '0.04')}`,
-        backdropFilter: 'blur(10px)',
+        boxShadow: `0 0 18px ${glowColor}`,
       }}
     >
       <div
