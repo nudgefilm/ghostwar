@@ -15,6 +15,7 @@ import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/c
 import { SoundEngine } from '@/lib/sounds'
 import EventTicker, { useEventTicker } from '@/components/EventTicker'
 import GlobalComms from '@/components/GlobalComms'
+import MobileView from '@/components/MobileView'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Globe = dynamic(() => import('@/components/Globe'), { ssr: false }) as any
@@ -733,45 +734,7 @@ export default function Home() {
     (weaponType === 'missile' ? missiles : nukes) < quantity
 
   // ─────────────────────────────────────────────────────────────────────────
-  if (isMobile) {
-    return (
-      <div
-        className="fixed inset-0 flex flex-col items-center justify-center font-mono px-6 text-center"
-        style={{ background: '#0B0B0C' }}
-      >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: 'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.18) 2px,rgba(0,0,0,0.18) 3px)',
-          }}
-        />
-        <div className="relative flex flex-col items-center gap-4 max-w-xs">
-          <div
-            className="text-4xl font-black tracking-[0.2em]"
-            style={{ color: '#FF2233', textShadow: '0 0 24px rgba(255,34,51,0.7)' }}
-          >
-            GHOST WAR
-          </div>
-          <div
-            className="text-xs tracking-[0.35em] font-bold"
-            style={{ color: '#00FFAA', textShadow: '0 0 10px rgba(0,255,170,0.5)' }}
-          >
-            GLOBAL WARFARE SIM
-          </div>
-          <div className="w-24 border-t" style={{ borderColor: 'rgba(255,34,51,0.3)' }} />
-          <p className="text-zinc-400 text-xs leading-relaxed tracking-wide">
-            GHOST WAR is optimized for desktop. Please access from a PC or laptop for the best experience.
-          </p>
-          <div
-            className="text-sm tracking-widest font-bold mt-2"
-            style={{ color: '#00AAFF', textShadow: '0 0 12px rgba(0,170,255,0.5)' }}
-          >
-            ghostwar.xyz
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (isMobile) return <MobileView />
 
   return (
     <div className="font-mono bg-[#0B0B0C]">
