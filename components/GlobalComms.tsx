@@ -125,11 +125,9 @@ export default function GlobalComms({ player }: Props) {
   // Visible messages: last N rows depending on expanded state
   const visibleMessages = messages.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
 
-  // Row height ≈ 18px (text-[10px] leading-snug) + 6px gap, plus 16px padding
-  const ROW_H = 18 + 6
-  const listHeight = visibleMessages.length === 0
-    ? 18
-    : visibleMessages.length * ROW_H - 6  // last row has no trailing gap
+  // Per-row budget for max-height cap: text-[11px] leading-snug ≈ 14px + space-y-1.5 gap 6px
+  const ROW_H = 22
+  const maxH = (expanded ? EXPANDED_ROWS : COLLAPSED_ROWS) * ROW_H + 16
 
   return (
     <div
@@ -146,12 +144,12 @@ export default function GlobalComms({ player }: Props) {
         className="flex items-center justify-between px-3 py-1.5 shrink-0"
         style={{ borderBottom: '1px solid rgba(0,255,170,0.18)' }}
       >
-        <span className="text-[10px] tracking-widest font-bold" style={{ color: '#00FFAA' }}>
+        <span className="text-[11px] tracking-widest font-bold" style={{ color: '#00FFAA' }}>
           GLOBAL COMMS
         </span>
         <button
           onClick={() => setExpanded(v => !v)}
-          className="text-[10px] leading-none transition-colors cursor-pointer"
+          className="text-[11px] leading-none transition-colors cursor-pointer"
           style={{ color: 'rgba(0,255,170,0.6)' }}
           onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#00FFAA' }}
           onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'rgba(0,255,170,0.6)' }}
@@ -161,22 +159,23 @@ export default function GlobalComms({ player }: Props) {
         </button>
       </div>
 
-      {/* Messages — height transitions smoothly */}
+      {/* Messages — max-height caps the box; content determines actual height (no empty gap) */}
       <div
         ref={listRef}
         className="px-2.5 py-2 space-y-1.5"
         style={{
-          height: `${listHeight + 16}px`,
-          transition: 'height 0.22s ease',
+          maxHeight: `${maxH}px`,
+          overflow: 'hidden',
           overflowY: expanded ? 'auto' : 'hidden',
+          transition: 'max-height 0.22s ease',
           scrollbarWidth: 'none',
         }}
       >
         {messages.length === 0 && (
-          <div className="text-zinc-600 text-[10px]">No messages yet…</div>
+          <div className="text-zinc-600 text-[11px]">No messages yet…</div>
         )}
         {visibleMessages.map(m => (
-          <div key={m.id} className="flex items-start gap-1.5 text-[10px] leading-snug">
+          <div key={m.id} className="flex items-start gap-1.5 text-[11px] leading-snug">
             <TwemojiFlag code={m.country_code} size={11} className="shrink-0 mt-px" />
             <span className="text-[#00FFAA] shrink-0 font-bold truncate max-w-[72px]">
               {m.nickname}:
@@ -210,12 +209,12 @@ export default function GlobalComms({ player }: Props) {
           disabled={!player}
           placeholder={player ? 'Send a message…' : 'Select a nation to join comms'}
           maxLength={MAX_CHARS}
-          className="flex-1 min-w-0 bg-transparent text-[10px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-40"
+          className="flex-1 min-w-0 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-40"
         />
         <button
           onClick={send}
           disabled={!player || !input.trim() || sending}
-          className="text-[10px] tracking-wider disabled:opacity-30 hover:text-white transition-colors cursor-pointer shrink-0"
+          className="text-[11px] tracking-wider disabled:opacity-30 hover:text-white transition-colors cursor-pointer shrink-0"
           style={{ color: '#00FFAA' }}
         >
           {sending ? '···' : 'SEND'}
