@@ -131,11 +131,9 @@ export default function Home() {
   const globeRef = useRef<GlobeHandle>(null)
   const launchingRef = useRef(false)
   const processedMissileIdsRef = useRef<Set<string>>(new Set())
-  const interceptedMissilesRef = useRef<Set<string>>(new Set())
   const launchedMissileIdsRef = useRef<Set<string>>(new Set())
   const impactSoundCountRef = useRef(0)
   const impactSoundResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const threatResolvedRef = useRef<Set<string>>(new Set())
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [targetCountry, setTargetCountry] = useState<string | null>(null)
@@ -177,22 +175,13 @@ export default function Home() {
 
   // ── Defense system state ──────────────────────────────────────────────────
   const [incomingThreats, setIncomingThreats] = useState<IncomingThreat[]>([])
-  const [defenseReadiness, setDefenseReadiness] = useState(0)
-  const [nukeInterceptArmed, setNukeInterceptArmed] = useState(false)
-  const [interceptNotif, setInterceptNotif] = useState<string | null>(null)
   const [tick, setTick] = useState(0)
   const [resetCountdown, setResetCountdown] = useState('--:--:--')
   const [todayStr, setTodayStr] = useState('')
 
-  // Stable ref for current defense state (used in setInterval closure)
-  const defenseStateRef = useRef({
-    player: null as Player | null,
-    nukes: 0,
-    defenseReadiness: 0,
-    nukeInterceptArmed: false,
-    incomingThreats: [] as IncomingThreat[],
-  })
-  defenseStateRef.current = { player, nukes, defenseReadiness, nukeInterceptArmed, incomingThreats }
+  // Stable ref for player (used in pagehide/beforeunload closure)
+  const defenseStateRef = useRef({ player: null as Player | null })
+  defenseStateRef.current = { player }
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -291,7 +280,7 @@ export default function Home() {
         if (homeCoords) globeRef.current?.flyTo(homeCoords[0], homeCoords[1], 1200)
       }
 
-      // Track incoming threats for interception
+      // Track incoming threats for WARNING display
       if (
         missile.target_country === player?.country_code &&
         missile.launcher_id !== player?.id
@@ -309,10 +298,8 @@ export default function Home() {
       }
 
       if (missile.launcher_country !== player?.country_code) {
-        console.log(`[LAUNCH-CHECK] id=${missile.id.slice(0,8)} alreadyLaunched=${launchedMissileIdsRef.current.has(missile.id)} setSize=${launchedMissileIdsRef.current.size}`)
         if (!launchedMissileIdsRef.current.has(missile.id)) {
           launchedMissileIdsRef.current.add(missile.id)
-          console.log(`[LAUNCH-FIRE] id=${missile.id.slice(0,8)} qty=${missile.quantity} type=${missile.type}`)
           const fromCoords = COUNTRY_COORDS[missile.launcher_country]
           const toCoords = COUNTRY_COORDS[missile.target_country]
           if (fromCoords && toCoords) {
@@ -774,13 +761,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Intercept success notification */}
-      {interceptNotif && (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 border border-[#00AAFF] bg-[#00AAFF]/10 text-[#00AAFF] text-xs tracking-widest">
-          {interceptNotif}
-        </div>
-      )}
-
       {/* Event ticker — centered below top bar, above globe */}
       <EventTicker queue={tickerQueue} onShift={shiftTicker} />
 
@@ -795,82 +775,23 @@ export default function Home() {
           const soundVolume = (data.type === 'nuke' ||
             data.launcherCountry === player?.country_code ||
             data.targetCountry === player?.country_code) ? 1.0 : 0.5
-          const isOwnMissile = data.launcherCountry === player?.country_code
 
-          // Judgment + API run once; sound fires on every staggered arrival (own + non-own)
+          // Judgment + API run once; sound fires on every staggered arrival
           if (processedMissileIdsRef.current.has(data.missileId)) {
-            const _isIntercepted = interceptedMissilesRef.current.has(data.missileId)
-            if (!_isIntercepted) {
-              impactSoundCountRef.current++
-              if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
-              impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
-              if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
-            }
+            impactSoundCountRef.current++
+            if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
+            impactSoundResetRef.current = setTimeout(() => { impactSoundCountRef.current = 0 }, 800)
+            if (impactSoundCountRef.current <= 10) SoundEngine.playImpact(soundVolume)
             return
           }
           processedMissileIdsRef.current.add(data.missileId)
-          // Read defense state from ref — avoids stale closure when rAF fires before
-          // React's useEffect syncs onImpactRef to the latest render's closure.
-          const _def = defenseStateRef.current
 
-          // ── Interception judgment (synchronous, no timer race) ────────────
-          const threat = _def.incomingThreats.find(t => t.id === data.missileId)
-          if (threat) {
-            let intercepted = false
-            let useNuke = false
-            if (threat.type === 'nuke') {
-              intercepted = _def.nukeInterceptArmed && _def.nukes > 0
-              useNuke = intercepted
-            } else {
-              intercepted = Math.random() < _def.defenseReadiness / 100
-            }
-
-            // Clean up threat state regardless of outcome
-            setIncomingThreats(prev => {
-              const remaining = prev.filter(t => t.id !== data.missileId)
-              if (remaining.length === 0) setInterceptAlert(null)
-              return remaining
-            })
-            setDefenseReadiness(0)
-            setNukeInterceptArmed(false)
-
-            if (intercepted) {
-              interceptedMissilesRef.current.add(data.missileId)
-              const coords = COUNTRY_COORDS[data.targetCountry]
-              if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
-              if (useNuke) setNukes(prev => Math.max(0, prev - 1))
-              SoundEngine.playIntercept()
-              setInterceptNotif('🛡️ INTERCEPTED!')
-              setTimeout(() => setInterceptNotif(null), 2000)
-              pushEventRef.current(
-                `🛡 INTERCEPT SUCCESSFUL — ${threat.quantity} ${threat.type}(s) destroyed`,
-                'defense',
-              )
-              if (player) {
-                fetch('/api/intercept', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    missile_id: data.missileId,
-                    intercepted: true,
-                    player_id: player.id,
-                    player_nickname: player.nickname,
-                    player_country_code: player.country_code,
-                  }),
-                }).catch(() => {})
-              }
-              setTimeout(() => setUnderAttackReport({
-                launcherCountry: threat.launcher_country,
-                quantity: threat.quantity,
-                interceptedCount: threat.quantity,
-                prevDamagePercent: 0,
-                newDamagePercent: 0,
-                wasIntercepted: true,
-              }), 900)
-              return
-            }
-            // Not intercepted: fall through to hit processing
-          }
+          // Clean up threat on arrival
+          setIncomingThreats(prev => {
+            const remaining = prev.filter(t => t.id !== data.missileId)
+            if (remaining.length === 0) setInterceptAlert(null)
+            return remaining
+          })
 
           // ── Hit: play sound immediately + call /api/impact ──────────────
           impactSoundCountRef.current++
@@ -894,13 +815,6 @@ export default function Home() {
               old_rank: number | null; new_rank: number | null
             }) => {
               if (!result.success) return
-
-              // Attacker's own missile: Globe auto-fires red on arrival; API response adds blue if intercepted
-              if (isOwnMissile && result.was_intercepted) {
-                const coords = COUNTRY_COORDS[data.targetCountry as string]
-                if (coords) globeRef.current?.triggerBlueExplosionAt(coords[0], coords[1])
-                SoundEngine.playIntercept()
-              }
 
               // Update DAMAGE RANKINGS from API response — no DB re-fetch, mirrors LIVE STRIKES pattern
               const targetCode = data.targetCountry as string
@@ -963,8 +877,7 @@ export default function Home() {
                 targetDestroyed: !result.already_processed && result.prev_damage_percent < 100 && result.new_damage_percent >= 100,
                 alliance_reduction_percent: result.alliance_reduction > 0 ? result.alliance_reduction : undefined,
               }
-              // Nuke: wait for mushroom cloud; intercepted: wait for blue effect to clear
-              const modalDelay = type === 'nuke' ? 5500 : result.was_intercepted ? 900 : 0
+              const modalDelay = type === 'nuke' ? 5500 : 0
               if (modalDelay > 0) setTimeout(() => setBattleReport(reportPayload), modalDelay)
               else setBattleReport(reportPayload)
             })
@@ -1294,82 +1207,45 @@ export default function Home() {
         {/* DEFENSE */}
         {primaryThreat ? (
           <div
-            className={`pointer-events-auto p-3 animate-pulse${tutorialStep === 4 ? ' tutorial-highlight' : ''}`}
+            className="pointer-events-auto p-3 animate-pulse"
             style={{ ...CARD, background: 'rgba(255,34,51,0.15)', borderColor: 'rgba(255,34,51,0.5)' }}
           >
-            {tutorialStep === 4 && (
-              <div className="text-[10px] tracking-wider mb-2 pb-1.5 border-b" style={{ color: '#00AAFF', borderColor: 'rgba(0,170,255,0.25)' }}>
-                ▶ Mash INTERCEPT to defend when under attack
-              </div>
-            )}
             <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold truncate">
               ⚠️ WARNING: {primaryThreat.quantity} INBOUND FROM {primaryThreat.launcher_country}
             </div>
-            {primaryThreat.type === 'nuke' ? (
-              nukes > 0 ? (
-                <button
-                  onClick={() => setNukeInterceptArmed(v => !v)}
-                  className={`w-full py-1.5 mb-2 text-[10px] tracking-widest border transition-colors cursor-pointer ${
-                    nukeInterceptArmed
-                      ? 'bg-orange-900/60 border-orange-600 text-orange-300'
-                      : 'bg-zinc-800/60 border-zinc-600 text-zinc-200 hover:border-orange-700'
-                  }`}
-                >
-                  {nukeInterceptArmed ? '☢️ NUKE ARMED ✓' : '🛡️ USE NUKE TO INTERCEPT'}
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-400 text-[10px] tracking-widest opacity-40 cursor-not-allowed"
-                >
-                  ☢️ NO NUKES AVAILABLE
-                </button>
+            <div className="text-zinc-400 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
+            {(() => {
+              const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
+              const rating = Math.round((100 - dmg) * 0.3)
+              const filled = Math.round(rating / 6)
+              return (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#FF2233] transition-all duration-700" style={{ width: `${rating}%` }} />
+                  </div>
+                  <span className="text-[#FF2233] text-[10px]">{rating}%</span>
+                  <span className="text-[#FF2233] text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
+                </div>
               )
-            ) : (
-              <button
-                onClick={() => setDefenseReadiness(prev => Math.min(100, prev + 5))}
-                className="w-full py-1.5 mb-2 bg-red-900/60 border border-red-700 text-red-300 text-[10px] tracking-widest cursor-pointer hover:bg-red-800/60 active:bg-red-700/60 transition-colors"
-              >
-                🛡️ INTERCEPT ({defenseReadiness}%)
-              </button>
-            )}
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#FF2233] transition-all duration-200"
-                  style={{ width: `${primaryThreat.type === 'nuke' ? (nukeInterceptArmed ? 100 : 0) : defenseReadiness}%` }}
-                />
-              </div>
-              <span className="text-[#FF2233] text-[10px]">
-                {primaryThreat.type === 'nuke' ? (nukeInterceptArmed ? '100%' : '0%') : `${defenseReadiness}%`}
-              </span>
-            </div>
-            {primaryThreat.type !== 'nuke' && defenseReadiness < 100 && (
-              <div className="text-[9px] tracking-wider mt-1" style={{ color: 'rgba(255,34,51,0.5)' }}>
-                Shield requires 100%
-              </div>
-            )}
+            })()}
           </div>
         ) : (
-          <div className={`pointer-events-auto p-3${tutorialStep === 4 ? ' tutorial-highlight' : ''}`} style={CARD}>
-            {tutorialStep === 4 && (
-              <div className="text-[10px] tracking-wider mb-2 pb-1.5 border-b" style={{ color: '#00AAFF', borderColor: 'rgba(0,170,255,0.25)' }}>
-                ▶ Mash INTERCEPT to defend when under attack
-              </div>
-            )}
+          <div className="pointer-events-auto p-3" style={CARD}>
             <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
-            <button
-              disabled
-              className="w-full py-1.5 mb-2 bg-zinc-800/60 border border-zinc-700 text-zinc-300 text-[10px] tracking-widest opacity-30 cursor-not-allowed"
-            >
-              🛡️ INTERCEPT
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-zinc-600" style={{ width: '0%' }} />
-              </div>
-              <span className="text-zinc-400 text-[10px]">0%</span>
-            </div>
+            {(() => {
+              const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
+              const rating = Math.round((100 - dmg) * 0.3)
+              const filled = Math.round(rating / 6)
+              return (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#00FFAA] transition-all duration-700" style={{ width: `${rating}%` }} />
+                  </div>
+                  <span className="text-zinc-300 text-[10px]">{rating}%</span>
+                  <span className="text-zinc-400 text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -1542,24 +1418,16 @@ export default function Home() {
           )}
         </div>
 
-        {/* HALL OF FAME — hidden when both rows are empty */}
-        {hofEntries.length > 0 && (
+        {/* HALL OF FAME — hidden when empty */}
+        {hofEntries.some(e => e.action === 'nuke_launched') && (
           <div className="pointer-events-auto p-3" style={CARD}>
             <div className="text-zinc-300 text-[10px] tracking-widest mb-2">HALL OF FAME</div>
-            <div className="space-y-1.5">
-              <HofRow
-                entries={hofEntries.filter(e => e.action === 'nuke_launched')}
-                color="#FF6600"
-                empty="No nuclear strikes yet"
-                formatEntry={e => `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`}
-              />
-              <HofRow
-                entries={hofEntries.filter(e => e.action === 'nuke_intercepted')}
-                color="#00AAFF"
-                empty="No interceptions yet"
-                formatEntry={e => `🛡 ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} INTERCEPTED A NUKE`}
-              />
-            </div>
+            <HofRow
+              entries={hofEntries.filter(e => e.action === 'nuke_launched')}
+              color="#FF6600"
+              empty="No nuclear strikes yet"
+              formatEntry={e => `☢ ${e.nickname} ${COUNTRY_FLAGS[e.country_code] ?? ''} NUCLEAR STRIKE`}
+            />
           </div>
         )}
 

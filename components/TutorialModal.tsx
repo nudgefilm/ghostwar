@@ -22,11 +22,6 @@ const STEPS: { icon: string; label: string; text: string }[] = [
     text: '20 missiles reload every day at 00:00 UTC (09:00 KST). Damaged nations also recover 10% daily.',
   },
   {
-    icon: '🛡️',
-    label: 'INTERCEPT',
-    text: 'Under attack? Rapidly click INTERCEPT to build readiness — shield activates only at 100% readiness. Nukes can only be countered by nukes.',
-  },
-  {
     icon: '📦',
     label: 'ARSENAL SUPPLY',
     text: 'Purchase missiles or the Strategic Pack (2 nukes + 500 missiles) via ARSENAL SUPPLY, then enter your code to redeem.',

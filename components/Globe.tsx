@@ -74,9 +74,6 @@ export interface GlobeHandle {
     targetCountry?: string,
     launcherCountry?: string,
   ) => void
-  markIntercepted: (missileId: string) => void
-  triggerBlueExplosionAt: (lat: number, lng: number) => void
-  suppressExplosion: (missileId: string) => void
   triggerRedExplosionAt: (lat: number, lng: number, type?: 'missile' | 'nuke') => void
 }
 
@@ -118,10 +115,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
   const missileCoreInstancesRef = useRef<THREE.InstancedMesh | null>(null)
   const activeMissilesRef = useRef<MissileState[]>([])
   const freeSlotsRef = useRef<number[]>([])
-  const blueExplosionRef = useRef<((pos: THREE.Vector3) => void) | null>(null)
   const redExplosionRef = useRef<((pos: THREE.Vector3, type: 'missile' | 'nuke') => void) | null>(null)
-  const suppressedExplosionsRef = useRef<Set<string>>(new Set())
-  const triggerCallCountRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     const mount = mountRef.current
@@ -553,12 +547,9 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
     }  // end doRedExplosionVisualAt
 
     const triggerExplosion = (m: MissileState) => {
-      const _cnt = (triggerCallCountRef.current.get(m.missileId ?? '') ?? 0) + 1
-      triggerCallCountRef.current.set(m.missileId ?? '', _cnt)
-      console.log(`[GLOBE-TRIGGER] id=${m.missileId?.slice(0,8)} call=${_cnt} suppressed=${m.missileId ? suppressedExplosionsRef.current.has(m.missileId) : false}`)
       onImpactRef.current?.({ missileId: m.missileId, targetCountry: m.targetCountry, launcherCountry: m.launcherCountry, type: m.type })
 
-      // Trail cleanup always runs regardless of intercept suppression
+      // Trail fade-out
       const trailT0 = performance.now()
       const animTrail = () => {
         const tp = Math.min((performance.now() - trailT0) / 2000, 1)
@@ -567,12 +558,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
         else { scene.remove(m.trailLine); m.trailGeo.dispose(); m.trailMat.dispose() }
       }
       requestAnimationFrame(animTrail)
-
-      // Suppressed: attacker waiting for API response to decide red vs blue
-      if (m.missileId && suppressedExplosionsRef.current.has(m.missileId)) {
-        suppressedExplosionsRef.current.delete(m.missileId)
-        return
-      }
 
       doRedExplosionVisualAt(m.impactPoint, m.type)
 
@@ -595,82 +580,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
       }
     }
 
-    // ── Blue spark explosion (interception) ─────────────────────────────────
-    const triggerBlueExplosion = (pos: THREE.Vector3) => {
-      const blueFlash = new THREE.PointLight(0x00AAFF, 3, 1.2)
-      blueFlash.position.copy(pos)
-      scene.add(blueFlash)
-      const bfT0 = performance.now()
-      const animBlueFlash = () => {
-        const fp = Math.min((performance.now() - bfT0) / 300, 1)
-        blueFlash.intensity = 3 * (1 - fp)
-        if (fp < 1) requestAnimationFrame(animBlueFlash)
-        else scene.remove(blueFlash)
-      }
-      requestAnimationFrame(animBlueFlash)
-
-      const rGeo = new THREE.RingGeometry(0.012, 0.018, 32)
-      const rMat = new THREE.MeshBasicMaterial({ color: 0x00AAFF, transparent: true, opacity: 0, side: THREE.DoubleSide })
-      const ring = new THREE.Mesh(rGeo, rMat)
-      ring.position.copy(pos)
-      ring.lookAt(new THREE.Vector3(0, 0, 0))
-      scene.add(ring)
-      const rT0 = performance.now()
-      const animBlueRing = () => {
-        const rp = Math.min((performance.now() - rT0) / 600, 1)
-        ring.scale.setScalar(1 + rp * 4)
-        rMat.opacity = rp < 0.2 ? 0.8 * (rp / 0.2) : 0.8 * (1 - (rp - 0.2) / 0.8)
-        if (rp < 1) requestAnimationFrame(animBlueRing)
-        else { scene.remove(ring); rGeo.dispose(); rMat.dispose() }
-      }
-      requestAnimationFrame(animBlueRing)
-
-      const sparkCanvas = document.createElement('canvas')
-      sparkCanvas.width = 32; sparkCanvas.height = 32
-      const sCtx = sparkCanvas.getContext('2d')!
-      const sGrad = sCtx.createRadialGradient(16, 16, 0, 16, 16, 16)
-      sGrad.addColorStop(0, 'rgba(255,255,255,1)')
-      sGrad.addColorStop(0.4, 'rgba(100,220,255,0.8)')
-      sGrad.addColorStop(1, 'rgba(0,170,255,0)')
-      sCtx.fillStyle = sGrad
-      sCtx.fillRect(0, 0, 32, 32)
-      const sparkTex = new THREE.CanvasTexture(sparkCanvas)
-      setTimeout(() => sparkTex.dispose(), 3000)
-
-      type SparkP = { sprite: THREE.Sprite; mat: THREE.SpriteMaterial; vel: THREE.Vector3; life: number; maxLife: number }
-      const sparks: SparkP[] = []
-      for (let d = 0; d < 20; d++) {
-        const sz = 0.003 + Math.random() * 0.008
-        const vel = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)
-          .normalize().multiplyScalar(0.002 + Math.random() * 0.005)
-        const mat = new THREE.SpriteMaterial({
-          map: sparkTex,
-          color: Math.random() < 0.3 ? 0xFFFFFF : 0x00AAFF,
-          transparent: true, opacity: 1,
-          depthWrite: false, blending: THREE.AdditiveBlending,
-        })
-        const sprite = new THREE.Sprite(mat)
-        sprite.scale.set(sz * 6, sz * 6, 1)
-        sprite.position.copy(pos)
-        scene.add(sprite)
-        sparks.push({ sprite, mat, vel, life: 0, maxLife: 30 })
-      }
-      const animSparks = () => {
-        for (let d = sparks.length - 1; d >= 0; d--) {
-          const p = sparks[d]
-          p.life++
-          p.sprite.position.add(p.vel)
-          const lr = p.life / p.maxLife
-          p.mat.opacity = 1 - lr
-          if (p.life >= p.maxLife) {
-            scene.remove(p.sprite); p.mat.dispose(); sparks.splice(d, 1)
-          }
-        }
-        if (sparks.length > 0) requestAnimationFrame(animSparks)
-      }
-      requestAnimationFrame(animSparks)
-    }
-    blueExplosionRef.current = triggerBlueExplosion
     redExplosionRef.current = doRedExplosionVisualAt
 
     // Render loop
@@ -910,49 +819,6 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
         }
       }
       requestAnimationFrame(tick)
-    },
-
-    markIntercepted(missileId: string) {
-      const instances = missileInstancesRef.current
-      const coreInstances = missileCoreInstancesRef.current
-
-      const idx = activeMissilesRef.current.findIndex(m => m.missileId === missileId)
-      if (idx === -1) return
-
-      const m = activeMissilesRef.current[idx]
-      const progress = Math.min((Date.now() - m.startTime) / m.flightMs, 1)
-      const pathIdx = Math.min(Math.floor(progress * PATH_COUNT), PATH_COUNT - 1)
-      const interceptPos = m.pathPoints[pathIdx]
-
-      activeMissilesRef.current.splice(idx, 1)
-      freeSlotsRef.current.push(m.instanceId)
-
-      const zeroScale = new THREE.Matrix4().makeScale(0, 0, 0)
-      if (instances) {
-        instances.setMatrixAt(m.instanceId, zeroScale)
-        instances.instanceMatrix.needsUpdate = true
-      }
-      if (coreInstances) {
-        coreInstances.setMatrixAt(m.instanceId, zeroScale)
-        coreInstances.instanceMatrix.needsUpdate = true
-      }
-
-      m.trailMat.opacity = 0
-      setTimeout(() => {
-        sceneRef.current?.remove(m.trailLine)
-        m.trailGeo.dispose()
-        m.trailMat.dispose()
-      }, 50)
-
-      blueExplosionRef.current?.(interceptPos)
-    },
-
-    triggerBlueExplosionAt(lat: number, lng: number) {
-      blueExplosionRef.current?.(latLngToVec3(lat, lng))
-    },
-
-    suppressExplosion(missileId: string) {
-      suppressedExplosionsRef.current.add(missileId)
     },
 
     triggerRedExplosionAt(lat: number, lng: number, type: 'missile' | 'nuke' = 'missile') {
