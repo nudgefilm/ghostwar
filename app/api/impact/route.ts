@@ -104,41 +104,32 @@ export async function POST(req: NextRequest) {
     })
   }
 
+  // Atomic damage increment — avoids read-then-write race when multiple missiles
+  // land on the same country simultaneously.
+  const weight = (missile.type as string) === 'nuke' ? 50 : 1
   const debuffed = (missile as Record<string, unknown>).attacker_debuffed === true
   const alliance_reduction = ((missile as Record<string, unknown>).alliance_reduction as number) ?? 0
-  const missileType = missile.type as string
+  const baseDelta = debuffed
+    ? Math.max(1, Math.floor((missile.quantity as number) * weight * 0.5))
+    : (missile.quantity as number) * weight
+  const delta = alliance_reduction > 0
+    ? Math.max(1, Math.floor(baseDelta * (1 - alliance_reduction / 100)))
+    : baseDelta
 
-  // Missile: direct +1% per missile via increment_missile_damage_direct (atomic)
-  // Nuke: existing damage_stack accumulator (weight 50, FLOOR/10)
-  let new_damage_percent = prev_damage_percent
+  const { data: dmgRows, error: countryUpdateError } = await supabase
+    .rpc('increment_country_damage', {
+      p_code:  target_country as string,
+      p_delta: delta,
+    })
 
-  if (missileType === 'nuke') {
-    const baseDelta = debuffed
-      ? Math.max(1, Math.floor((missile.quantity as number) * 50 * 0.5))
-      : (missile.quantity as number) * 50
-    const delta = alliance_reduction > 0
-      ? Math.max(1, Math.floor(baseDelta * (1 - alliance_reduction / 100)))
-      : baseDelta
-    const { data: nukeRows, error: nukeErr } = await supabase
-      .rpc('increment_country_damage', { p_code: target_country as string, p_delta: delta })
-    if (nukeErr) console.error('[impact] nuke damage failed:', nukeErr)
-    const nukeRow = Array.isArray(nukeRows) && nukeRows.length > 0
-      ? (nukeRows[0] as { new_stack: number; new_percent: number }) : null
-    if (nukeRow) new_damage_percent = Number(nukeRow.new_percent)
-  } else {
-    const baseDelta = debuffed
-      ? Math.max(1, Math.floor((missile.quantity as number) * 0.5))
-      : (missile.quantity as number)
-    const delta = alliance_reduction > 0
-      ? Math.max(1, Math.floor(baseDelta * (1 - alliance_reduction / 100)))
-      : baseDelta
-    const { data: mslRows, error: mslErr } = await supabase
-      .rpc('increment_missile_damage_direct', { p_code: target_country as string, p_delta: delta })
-    if (mslErr) console.error('[impact] missile damage failed:', mslErr)
-    const mslRow = Array.isArray(mslRows) && mslRows.length > 0
-      ? (mslRows[0] as { new_percent: number }) : null
-    if (mslRow) new_damage_percent = Number(mslRow.new_percent)
+  if (countryUpdateError) {
+    console.error('[impact] damage increment failed:', countryUpdateError)
   }
+
+  const dmgRow = Array.isArray(dmgRows) && dmgRows.length > 0
+    ? (dmgRows[0] as { new_stack: number; new_percent: number })
+    : null
+  const new_damage_percent: number = dmgRow ? Number(dmgRow.new_percent) : prev_damage_percent
 
   // First time reaching 100% — broadcast DESTROYED news
   if (prev_damage_percent < 100 && new_damage_percent >= 100) {
