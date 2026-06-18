@@ -1233,8 +1233,8 @@ export default function Home() {
             <div className="text-zinc-400 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
             {(() => {
               const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
-              const rating = Math.round((100 - dmg) * 0.3)
-              const filled = Math.round(rating / 6)
+              const rating = Math.round(100 - dmg)
+              const filled = Math.min(5, Math.round(rating / 20))
               return (
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
@@ -1277,8 +1277,8 @@ export default function Home() {
             <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
             {(() => {
               const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
-              const rating = Math.round((100 - dmg) * 0.3)
-              const filled = Math.round(rating / 6)
+              const rating = Math.round(100 - dmg)
+              const filled = Math.min(5, Math.round(rating / 20))
               return (
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
