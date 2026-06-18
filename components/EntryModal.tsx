@@ -195,11 +195,28 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       className="fixed inset-0 z-[100] flex flex-col font-mono overflow-hidden"
       style={{ background: '#0B0B0C' }}
     >
-      {/* Scanline texture overlay */}
-      <div className="absolute inset-0 pointer-events-none" style={{
-        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.12) 2px, rgba(255,255,255,0.12) 4px)',
+      {/* Animated scan band */}
+      <div className="pointer-events-none" style={{
+        position: 'fixed',
+        inset: 0,
         zIndex: 1,
-      }} />
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          height: '25%',
+          background: 'linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.04) 60%, transparent 100%)',
+          animation: 'scanBand 5s linear infinite',
+        }} />
+      </div>
+      <style>{`
+        @keyframes scanBand {
+          0%   { top: -25%; }
+          100% { top: 100%; }
+        }
+      `}</style>
       {/* Subtle noise vignette */}
       <div className="absolute inset-0 pointer-events-none" style={{
         background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.65) 100%)',
@@ -222,12 +239,12 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       </div>
 
       {/* ── Main content (vertically centered) ─────────────────────────────── */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-2">
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-1">
         <div className="w-full max-w-sm">
 
           {/* ── Title ──────────────────────────────────────────────────────── */}
           <div className="text-center mb-3">
-            <div className="text-[10px] text-zinc-500 tracking-[0.4em] mb-2">
+            <div className="text-[10px] text-zinc-500 tracking-[0.4em] mb-1">
               ── SECURE CHANNEL ESTABLISHED ──
             </div>
             <h1
@@ -395,7 +412,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
 
       {/* ── Live ticker ─────────────────────────────────────────────────────── */}
       <div className="relative z-10 border-t border-zinc-800/60 px-4 py-2">
-        <div className="text-[10px] tracking-wider text-zinc-500">
+        <div className="text-[10px] tracking-wider text-zinc-500 text-center">
           <LiveTicker text={latestStrike} />
         </div>
       </div>
