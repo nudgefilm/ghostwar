@@ -58,6 +58,7 @@ interface MissileState {
   missileId?: string
   targetCountry?: string
   launcherCountry?: string
+  shieldTriggered: boolean
 }
 
 export interface GlobeHandle {
@@ -264,6 +265,55 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
     coreInstances.instanceMatrix.needsUpdate = true
     scene.add(coreInstances)
     missileCoreInstancesRef.current = coreInstances
+
+    // ── Green shield pre-arrival effect ─────────────────────────────────
+    const doGreenShieldAt = (ip: THREE.Vector3) => {
+      const impactNorm = ip.clone().normalize()
+      const T = 600
+
+      const rGeo = new THREE.RingGeometry(0.03, 0.045, 32)
+      const rMat = new THREE.MeshBasicMaterial({
+        color: 0x00FF88, transparent: true, opacity: 1,
+        side: THREE.DoubleSide, depthWrite: false,
+      })
+      const ring = new THREE.Mesh(rGeo, rMat)
+      ring.position.copy(ip)
+      ring.lookAt(new THREE.Vector3(0, 0, 0))
+      scene.add(ring)
+
+      const pGeo = new THREE.CylinderGeometry(0.008, 0.008, 1, 8, 1, true)
+      pGeo.translate(0, 0.5, 0)
+      const pMat = new THREE.MeshBasicMaterial({
+        color: 0x00FF88, transparent: true, opacity: 0.6,
+        side: THREE.DoubleSide, depthWrite: false,
+      })
+      const pillar = new THREE.Mesh(pGeo, pMat)
+      pillar.position.copy(ip)
+      const upY = new THREE.Vector3(0, 1, 0)
+      if (impactNorm.dot(upY) < -0.9999) {
+        pillar.quaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI)
+      } else {
+        pillar.quaternion.setFromUnitVectors(upY, impactNorm)
+      }
+      pillar.scale.set(1, 0.001, 1)
+      scene.add(pillar)
+
+      const t0 = performance.now()
+      const animShield = () => {
+        const p = Math.min((performance.now() - t0) / T, 1)
+        ring.scale.setScalar(p * 2)
+        rMat.opacity = 1 - p
+        pillar.scale.y = Math.max(0.001, p * 0.3)
+        pMat.opacity = 0.6 * (1 - p)
+        if (p < 1) {
+          requestAnimationFrame(animShield)
+        } else {
+          scene.remove(ring); rGeo.dispose(); rMat.dispose()
+          scene.remove(pillar); pGeo.dispose(); pMat.dispose()
+        }
+      }
+      requestAnimationFrame(animShield)
+    }
 
     // ── Explosion trigger ────────────────────────────────────────────────
     const debrisColors = [0xFF4400, 0xFF6600, 0xFF8800, 0xFFCC00, 0xFF2233]
@@ -660,6 +710,17 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
           m.trailGeo.setDrawRange(0, hn)
           m.trailGeo.attributes.position.needsUpdate = true
           m.trailGeo.attributes.color.needsUpdate = true
+
+          // Green shield pre-arrival effect (fires once at progress >= 0.9)
+          if (progress >= 0.9 && !m.shieldTriggered) {
+            m.shieldTriggered = true
+            doGreenShieldAt(m.impactPoint)
+          }
+          // Hide missile mesh at progress >= 0.95
+          if (progress >= 0.95) {
+            instances.setMatrixAt(m.instanceId, zeroScaleM)
+            if (coreInstances) coreInstances.setMatrixAt(m.instanceId, zeroScaleM)
+          }
         } else {
           // Impact: hide both instances, return slot, trigger explosion
           instances.setMatrixAt(m.instanceId, zeroScaleM)
@@ -881,6 +942,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
             missileId,
             targetCountry,
             launcherCountry,
+            shieldTriggered: false,
           })
         }, i * 200)
       }
