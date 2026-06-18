@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
     .eq('shield_active', true)
     .limit(1)
 
-  if (shieldRows && shieldRows.length > 0) {
+  if (shieldRows && shieldRows.length > 0 && (missile.type as string) !== 'nuke') {
     await supabase
       .from('players')
       .update({ shield_active: false })

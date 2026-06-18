@@ -714,9 +714,10 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, sh
           m.trailGeo.attributes.position.needsUpdate = true
           m.trailGeo.attributes.color.needsUpdate = true
 
-          // Green shield pre-arrival effect — only when player's country has shield active
+          // Green shield pre-arrival effect — only when player's country has shield active (nukes bypass)
           if (progress >= 0.9 && !m.shieldTriggered
-              && shieldActiveRef.current && m.targetCountry === playerCountryRef.current) {
+              && shieldActiveRef.current && m.targetCountry === playerCountryRef.current
+              && m.type !== 'nuke') {
             m.shieldTriggered = true
             doGreenShieldAt(m.impactPoint)
           }
