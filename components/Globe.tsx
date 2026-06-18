@@ -99,9 +99,10 @@ export interface ImpactData {
 interface GlobeProps {
   onImpact?: (data: ImpactData) => void
   playerCountry?: string
+  shieldActive?: boolean
 }
 
-const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, ref) => {
+const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, shieldActive }, ref) => {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -111,6 +112,8 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
   useEffect(() => { onImpactRef.current = onImpact }, [onImpact])
   const playerCountryRef = useRef(playerCountry)
   useEffect(() => { playerCountryRef.current = playerCountry }, [playerCountry])
+  const shieldActiveRef = useRef(shieldActive ?? false)
+  useEffect(() => { shieldActiveRef.current = shieldActive ?? false }, [shieldActive])
 
   const missileInstancesRef = useRef<THREE.InstancedMesh | null>(null)
   const missileCoreInstancesRef = useRef<THREE.InstancedMesh | null>(null)
@@ -711,13 +714,14 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry }, 
           m.trailGeo.attributes.position.needsUpdate = true
           m.trailGeo.attributes.color.needsUpdate = true
 
-          // Green shield pre-arrival effect (fires once at progress >= 0.9)
-          if (progress >= 0.9 && !m.shieldTriggered) {
+          // Green shield pre-arrival effect — only when player's country has shield active
+          if (progress >= 0.9 && !m.shieldTriggered
+              && shieldActiveRef.current && m.targetCountry === playerCountryRef.current) {
             m.shieldTriggered = true
             doGreenShieldAt(m.impactPoint)
           }
-          // Hide missile mesh at progress >= 0.95
-          if (progress >= 0.95) {
+          // Hide missile mesh at progress >= 0.95 only when shield effect is running
+          if (progress >= 0.95 && m.shieldTriggered) {
             instances.setMatrixAt(m.instanceId, zeroScaleM)
             if (coreInstances) coreInstances.setMatrixAt(m.instanceId, zeroScaleM)
           }

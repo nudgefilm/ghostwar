@@ -183,6 +183,8 @@ export default function Home() {
   pushEventRef.current = pushEvent
 
   // ── Defense system state ──────────────────────────────────────────────────
+  const [shieldActive, setShieldActive] = useState(false)
+  const [shieldActivating, setShieldActivating] = useState(false)
   const [incomingThreats, setIncomingThreats] = useState<IncomingThreat[]>([])
   const [tick, setTick] = useState(0)
   const [resetCountdown, setResetCountdown] = useState('--:--:--')
@@ -777,7 +779,7 @@ export default function Home() {
 
       {/* Globe — full screen */}
       <div className="fixed inset-0 z-0" style={{ width: '100vw', height: '100vh' }}>
-        <Globe ref={globeRef} playerCountry={player?.country_code} onImpact={(data: ImpactData) => {
+        <Globe ref={globeRef} playerCountry={player?.country_code} shieldActive={shieldActive} onImpact={(data: ImpactData) => {
           SoundEngine.init()
           setActiveCount(prev => Math.max(0, prev - 1))
 
@@ -804,6 +806,9 @@ export default function Home() {
             return remaining
           })
 
+          // Shield resets when any missile arrives at player's country
+          if (data.targetCountry === player?.country_code) setShieldActive(false)
+
           // ── Hit: play sound immediately + call /api/impact ──────────────
           impactSoundCountRef.current++
           if (impactSoundResetRef.current) clearTimeout(impactSoundResetRef.current)
@@ -818,6 +823,7 @@ export default function Home() {
             .then(r => r.json())
             .then((result: {
               success: boolean; already_processed: boolean; was_intercepted: boolean
+              shield_blocked?: boolean
               launcher_id: string; launcher_country: string
               quantity: number; type: string
               attacker_debuffed: boolean
@@ -1239,6 +1245,32 @@ export default function Home() {
                 </div>
               )
             })()}
+            {player && (
+              <button
+                className="mt-2 w-full text-[10px] tracking-widest py-1 px-2 bg-transparent transition-colors duration-200"
+                style={shieldActive
+                  ? { border: '1px solid #00FF88', color: '#00FF88' }
+                  : { border: '1px solid rgba(255,34,51,0.4)', color: 'rgba(255,34,51,0.7)' }}
+                disabled={shieldActive || shieldActivating}
+                onClick={async () => {
+                  if (shieldActivating) return
+                  setShieldActivating(true)
+                  try {
+                    const r = await fetch('/api/player/shield', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ player_id: player.id }),
+                    })
+                    const json = await r.json() as { success?: boolean }
+                    if (json.success) setShieldActive(true)
+                  } finally {
+                    setShieldActivating(false)
+                  }
+                }}
+              >
+                {shieldActivating ? 'ACTIVATING...' : shieldActive ? 'SHIELD ACTIVE' : 'ACTIVATE SHIELD'}
+              </button>
+            )}
           </div>
         ) : (
           <div className="pointer-events-auto p-3" style={CARD}>
@@ -1257,6 +1289,32 @@ export default function Home() {
                 </div>
               )
             })()}
+            {player && (
+              <button
+                className="mt-2 w-full text-[10px] tracking-widest py-1 px-2 bg-transparent transition-colors duration-200"
+                style={shieldActive
+                  ? { border: '1px solid #00FF88', color: '#00FF88' }
+                  : { border: '1px solid rgba(0,255,170,0.3)', color: 'rgba(0,255,170,0.6)' }}
+                disabled={shieldActive || shieldActivating}
+                onClick={async () => {
+                  if (shieldActivating) return
+                  setShieldActivating(true)
+                  try {
+                    const r = await fetch('/api/player/shield', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ player_id: player.id }),
+                    })
+                    const json = await r.json() as { success?: boolean }
+                    if (json.success) setShieldActive(true)
+                  } finally {
+                    setShieldActivating(false)
+                  }
+                }}
+              >
+                {shieldActivating ? 'ACTIVATING...' : shieldActive ? 'SHIELD ACTIVE' : 'ACTIVATE SHIELD'}
+              </button>
+            )}
           </div>
         )}
 

@@ -72,6 +72,38 @@ export async function POST(req: NextRequest) {
     })
   }
 
+  // Shield check: if any player in target country has shield_active, block damage
+  const { data: shieldRows } = await supabase
+    .from('players')
+    .select('id')
+    .eq('country_code', target_country as string)
+    .eq('shield_active', true)
+    .limit(1)
+
+  if (shieldRows && shieldRows.length > 0) {
+    await supabase
+      .from('players')
+      .update({ shield_active: false })
+      .eq('country_code', target_country as string)
+      .eq('shield_active', true)
+    return NextResponse.json({
+      success: true,
+      already_processed: false,
+      was_intercepted: true,
+      shield_blocked: true,
+      launcher_id: missile.launcher_id,
+      launcher_country: missile.launcher_country,
+      quantity: missile.quantity,
+      type: missile.type,
+      attacker_debuffed: (missile as Record<string, unknown>).attacker_debuffed ?? false,
+      alliance_reduction: ((missile as Record<string, unknown>).alliance_reduction as number) ?? 0,
+      prev_damage_percent,
+      new_damage_percent: prev_damage_percent,
+      old_rank: null,
+      new_rank: null,
+    })
+  }
+
   // Atomic damage increment — avoids read-then-write race when multiple missiles
   // land on the same country simultaneously.
   const weight = (missile.type as string) === 'nuke' ? 50 : 1
