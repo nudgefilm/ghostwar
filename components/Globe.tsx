@@ -272,11 +272,13 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, sh
     // ── Green shield pre-arrival effect ─────────────────────────────────
     const doGreenShieldAt = (ip: THREE.Vector3) => {
       const impactNorm = ip.clone().normalize()
-      const T = 600
+      const T = 1200  // total 1.2s
+      const BLINKS = 3
+      const BLINK_MS = T / BLINKS  // 400ms per blink
 
       const rGeo = new THREE.RingGeometry(0.03, 0.045, 32)
       const rMat = new THREE.MeshBasicMaterial({
-        color: 0x00FF88, transparent: true, opacity: 1,
+        color: 0x00FF88, transparent: true, opacity: 0,
         side: THREE.DoubleSide, depthWrite: false,
       })
       const ring = new THREE.Mesh(rGeo, rMat)
@@ -287,7 +289,7 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, sh
       const pGeo = new THREE.CylinderGeometry(0.008, 0.008, 1, 8, 1, true)
       pGeo.translate(0, 0.5, 0)
       const pMat = new THREE.MeshBasicMaterial({
-        color: 0x00FF88, transparent: true, opacity: 0.6,
+        color: 0x00FF88, transparent: true, opacity: 0,
         side: THREE.DoubleSide, depthWrite: false,
       })
       const pillar = new THREE.Mesh(pGeo, pMat)
@@ -303,11 +305,17 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, sh
 
       const t0 = performance.now()
       const animShield = () => {
-        const p = Math.min((performance.now() - t0) / T, 1)
-        ring.scale.setScalar(p * 2)
-        rMat.opacity = 1 - p
-        pillar.scale.y = Math.max(0.001, p * 0.3)
+        const elapsed = performance.now() - t0
+        const p = Math.min(elapsed / T, 1)
+
+        // Ring: 3x blink — each 400ms cycle is fade-in (0→0.2s) then fade-out (0.2→0.4s)
+        const phase = (elapsed % BLINK_MS) / BLINK_MS  // 0→1 within each blink cycle
+        rMat.opacity = phase < 0.5 ? phase * 2 : (1 - phase) * 2
+
+        // Pillar: grows to full height in first half, fades out over full duration
+        pillar.scale.y = Math.max(0.001, Math.min(p * 2, 1) * 0.3)
         pMat.opacity = 0.6 * (1 - p)
+
         if (p < 1) {
           requestAnimationFrame(animShield)
         } else {
