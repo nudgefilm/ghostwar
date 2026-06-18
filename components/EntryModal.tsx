@@ -79,7 +79,10 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       }
       if (strikes != null) setStrikesToday(strikes)
       if (nukes != null) setNukesDeployed(nukes)
-      if (newsRow?.content) setLatestStrike('🔴 BREAKING: ' + newsRow.content)
+      if (newsRow?.content) {
+        const raw = newsRow.content.replace(/^🔴\s*BREAKING:\s*/i, '')
+        setLatestStrike('🔴 BREAKING: ' + raw)
+      }
     }
 
     load()
@@ -90,7 +93,8 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'news_feed' }, payload => {
         const row = payload.new as { content: string; type: string | null }
         if (row.type !== 'daily_brief') {
-          setLatestStrike('🔴 BREAKING: ' + row.content)
+          const raw = row.content.replace(/^🔴\s*BREAKING:\s*/i, '')
+          setLatestStrike('🔴 BREAKING: ' + raw)
           setStrikesToday(prev => (prev ?? 0) + 1)
         }
         if (row.type === 'nuke') {
@@ -193,7 +197,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
     >
       {/* Scanline texture overlay */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.015) 2px, rgba(255,255,255,0.015) 4px)',
+        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.04) 2px, rgba(255,255,255,0.04) 4px)',
         zIndex: 1,
       }} />
       {/* Subtle noise vignette */}
@@ -251,13 +255,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           {/* ── Alliance badges ─────────────────────────────────────────────── */}
           <div className="flex items-center justify-center gap-5 mb-6">
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-20 h-20 border border-[#FF2233]/40 overflow-hidden"
+              <div className="w-[130px] h-[130px] border border-[#FF2233]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #FF223344' }}>
                 <Image
                   src="/GHOST_LEGION.jpeg"
                   alt="GHOST LEGION"
-                  width={80}
-                  height={80}
+                  width={130}
+                  height={130}
                   className="w-full h-full object-cover"
                   unoptimized
                 />
@@ -278,13 +282,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
             </div>
 
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-20 h-20 border border-[#0088FF]/40 overflow-hidden"
+              <div className="w-[130px] h-[130px] border border-[#0088FF]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #0088FF44' }}>
                 <Image
                   src="/PHANTOM_ORDER.jpeg"
                   alt="PHANTOM ORDER"
-                  width={80}
-                  height={80}
+                  width={130}
+                  height={130}
                   className="w-full h-full object-cover"
                   unoptimized
                 />
