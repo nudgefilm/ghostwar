@@ -239,16 +239,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       </div>
 
       {/* ── Main content (vertically centered) ─────────────────────────────── */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-1">
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-0">
         <div className="w-full max-w-sm">
 
           {/* ── Title ──────────────────────────────────────────────────────── */}
-          <div className="text-center mb-3">
-            <div className="text-[10px] text-zinc-500 tracking-[0.4em] mb-1">
-              ── SECURE CHANNEL ESTABLISHED ──
-            </div>
+          <div className="text-center mb-1">
             <h1
-              className="text-3xl font-bold tracking-[0.18em] mb-2"
+              className="text-3xl font-bold tracking-[0.18em] mb-1"
               style={{
                 color: '#FF2233',
                 textShadow: '0 0 8px #FF2233, 0 0 20px #FF223399, 0 0 40px #FF223355',
@@ -270,15 +267,15 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           </div>
 
           {/* ── Alliance badges ─────────────────────────────────────────────── */}
-          <div className="flex items-center justify-center gap-5 mb-3">
+          <div className="flex items-center justify-center gap-5 mb-2">
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-[100px] h-[100px] border border-[#FF2233]/40 overflow-hidden"
+              <div className="w-[140px] h-[140px] border border-[#FF2233]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #FF223344' }}>
                 <Image
                   src="/GHOST_LEGION.jpeg"
                   alt="GHOST LEGION"
-                  width={100}
-                  height={100}
+                  width={140}
+                  height={140}
                   className="w-full h-full object-cover"
                   unoptimized
                 />
@@ -299,13 +296,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
             </div>
 
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-[100px] h-[100px] border border-[#0088FF]/40 overflow-hidden"
+              <div className="w-[140px] h-[140px] border border-[#0088FF]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #0088FF44' }}>
                 <Image
                   src="/PHANTOM_ORDER.jpeg"
                   alt="PHANTOM ORDER"
-                  width={100}
-                  height={100}
+                  width={140}
+                  height={140}
                   className="w-full h-full object-cover"
                   unoptimized
                 />
