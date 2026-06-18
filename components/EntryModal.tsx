@@ -197,7 +197,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
     >
       {/* Scanline texture overlay */}
       <div className="absolute inset-0 pointer-events-none" style={{
-        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.04) 2px, rgba(255,255,255,0.04) 4px)',
+        backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.12) 2px, rgba(255,255,255,0.12) 4px)',
         zIndex: 1,
       }} />
       {/* Subtle noise vignette */}
@@ -207,7 +207,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       }} />
 
       {/* ── Top stats bar ───────────────────────────────────────────────────── */}
-      <div className="relative z-10 flex items-center justify-center gap-6 px-4 py-3 border-b border-zinc-800/60 text-[10px] tracking-[0.25em] text-zinc-400 flex-wrap">
+      <div className="relative z-10 flex items-center justify-center gap-6 px-4 py-2 border-b border-zinc-800/60 text-[10px] tracking-[0.25em] text-zinc-400 flex-wrap">
         <span>
           🌐 <span className="text-[#00FFAA] font-bold">{fmt(operatorsOnline)}</span> OPERATORS ONLINE
         </span>
@@ -222,16 +222,16 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       </div>
 
       {/* ── Main content (vertically centered) ─────────────────────────────── */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-6">
+      <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-2">
         <div className="w-full max-w-sm">
 
           {/* ── Title ──────────────────────────────────────────────────────── */}
-          <div className="text-center mb-6">
-            <div className="text-[10px] text-zinc-500 tracking-[0.4em] mb-3">
+          <div className="text-center mb-3">
+            <div className="text-[10px] text-zinc-500 tracking-[0.4em] mb-2">
               ── SECURE CHANNEL ESTABLISHED ──
             </div>
             <h1
-              className="text-3xl font-bold tracking-[0.18em] mb-4"
+              className="text-3xl font-bold tracking-[0.18em] mb-2"
               style={{
                 color: '#FF2233',
                 textShadow: '0 0 8px #FF2233, 0 0 20px #FF223399, 0 0 40px #FF223355',
@@ -253,15 +253,15 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           </div>
 
           {/* ── Alliance badges ─────────────────────────────────────────────── */}
-          <div className="flex items-center justify-center gap-5 mb-6">
+          <div className="flex items-center justify-center gap-5 mb-3">
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-[130px] h-[130px] border border-[#FF2233]/40 overflow-hidden"
+              <div className="w-[100px] h-[100px] border border-[#FF2233]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #FF223344' }}>
                 <Image
                   src="/GHOST_LEGION.jpeg"
                   alt="GHOST LEGION"
-                  width={130}
-                  height={130}
+                  width={100}
+                  height={100}
                   className="w-full h-full object-cover"
                   unoptimized
                 />
@@ -282,13 +282,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
             </div>
 
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-[130px] h-[130px] border border-[#0088FF]/40 overflow-hidden"
+              <div className="w-[100px] h-[100px] border border-[#0088FF]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #0088FF44' }}>
                 <Image
                   src="/PHANTOM_ORDER.jpeg"
                   alt="PHANTOM ORDER"
-                  width={130}
-                  height={130}
+                  width={100}
+                  height={100}
                   className="w-full h-full object-cover"
                   unoptimized
                 />
@@ -310,8 +310,8 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
             <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[#FF2233]" />
             <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[#FF2233]" />
 
-            <div className="bg-zinc-950/90 border border-zinc-800 p-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="bg-zinc-950/90 border border-zinc-800 p-4">
+              <form onSubmit={handleSubmit} className="space-y-3">
                 {/* Callsign input */}
                 <div>
                   <label className="text-zinc-400 text-[11px] tracking-[0.3em] block mb-1.5">
@@ -325,7 +325,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
                     maxLength={16}
                     placeholder="ENTER CALLSIGN..."
                     autoFocus
-                    className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-sm px-3 py-2.5 outline-none transition-colors placeholder:text-zinc-600 tracking-widest"
+                    className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-sm px-3 py-2 outline-none transition-colors placeholder:text-zinc-600 tracking-widest"
                   />
                   <div className="text-zinc-600 text-[10px] mt-1">
                     {nickname.length}/16 — A-Z, 0-9, _ only
@@ -340,7 +340,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
                   <select
                     value={countryCode}
                     onChange={e => setCountryCode(e.target.value)}
-                    className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-sm px-3 py-2.5 outline-none transition-colors cursor-pointer appearance-none"
+                    className="w-full bg-black border border-zinc-700 focus:border-[#FF2233] text-zinc-200 text-sm px-3 py-2 outline-none transition-colors cursor-pointer appearance-none"
                   >
                     <option value="">─── SELECT NATION ───</option>
                     {COUNTRIES.map(c => (
@@ -379,13 +379,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full py-3 bg-[#FF2233]/10 border border-[#FF2233] text-[#FF2233] text-sm tracking-[0.3em] hover:bg-[#FF2233]/20 active:bg-[#FF2233]/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed neon-border-pulse"
+                  className="w-full py-2.5 bg-[#FF2233]/10 border border-[#FF2233] text-[#FF2233] text-sm tracking-[0.3em] hover:bg-[#FF2233]/20 active:bg-[#FF2233]/30 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed neon-border-pulse"
                 >
                   {loading ? '[ CONNECTING... ]' : '[ ENTER WAR ROOM ]'}
                 </button>
               </form>
 
-              <div className="text-center mt-4 text-zinc-600 text-[10px] tracking-widest">
+              <div className="text-center mt-3 text-zinc-600 text-[10px] tracking-widest">
                 BY ENTERING YOU ACCEPT THE TERMS OF TOTAL WAR
               </div>
             </div>
@@ -394,8 +394,8 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       </div>
 
       {/* ── Live ticker ─────────────────────────────────────────────────────── */}
-      <div className="relative z-10 border-t border-zinc-800/60 px-4 py-2.5">
-        <div className="text-[10px] tracking-wider text-zinc-500 truncate">
+      <div className="relative z-10 border-t border-zinc-800/60 px-4 py-2">
+        <div className="text-[10px] tracking-wider text-zinc-500">
           <LiveTicker text={latestStrike} />
         </div>
       </div>
