@@ -928,7 +928,7 @@ export default function Home() {
       </div>
 
       {/* Global Comms — bottom-left overlay on globe */}
-      <GlobalComms player={player} />
+      <GlobalComms player={player} playerAllianceId={playerAllianceId} />
 
       {/* Rules Modal */}
       {showRules && <RulesModal onClose={handleRulesClose} />}
