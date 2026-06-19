@@ -76,7 +76,7 @@ export default function AllianceJoinCard({ playerId, currentAllianceId, alliance
           <button
             onClick={handleConfirm}
             disabled={loading}
-            className="mt-4 px-12 py-3 font-black tracking-widest text-black text-lg transition-opacity disabled:opacity-40"
+            className="mt-4 px-12 py-3 font-black tracking-widest text-black text-lg transition-opacity cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ backgroundColor: selected.color }}
           >
             {loading ? 'JOINING...' : 'CONFIRM'}
@@ -84,7 +84,7 @@ export default function AllianceJoinCard({ playerId, currentAllianceId, alliance
 
           <button
             onClick={() => setShowConfirm(false)}
-            className="text-zinc-500 text-xs tracking-widest hover:text-zinc-300 transition-colors"
+            className="text-zinc-500 text-xs tracking-widest hover:text-zinc-300 transition-colors cursor-pointer"
           >
             CANCEL
           </button>
@@ -104,7 +104,7 @@ export default function AllianceJoinCard({ playerId, currentAllianceId, alliance
               key={alliance.id}
               onClick={() => handleSelect(alliance)}
               disabled={isJoined}
-              className="flex-1 flex flex-col items-center gap-3 py-5 border transition-all disabled:cursor-default"
+              className="flex-1 flex flex-col items-center gap-3 py-5 border transition-all cursor-pointer disabled:cursor-default"
               style={{
                 borderColor: isJoined ? alliance.color : `${alliance.color}40`,
                 backgroundColor: isJoined ? `${alliance.color}15` : 'transparent',
