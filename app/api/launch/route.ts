@@ -61,20 +61,40 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient()
 
-  // Check ammo + scorched earth debuff (parallel)
+  // Check ammo + defense state (parallel)
   const [
     { data: playerData, error: playerError },
     { data: launcherCountryData },
+    { data: targetCountryData },
   ] = await Promise.all([
-    supabase.from('players').select('missiles_remaining, nukes_remaining').eq('id', launcher_id).single(),
-    supabase.from('countries').select('damage_percent').eq('code', launcher_country).single(),
+    supabase.from('players').select('missiles_remaining, nukes_remaining, attacked_until').eq('id', launcher_id as string).single(),
+    supabase.from('countries').select('damage_percent, defense_rating').eq('code', launcher_country).single(),
+    supabase.from('countries').select('defense_rating').eq('code', target_country).single(),
   ])
 
   if (playerError || !playerData) {
     return NextResponse.json({ error: 'PLAYER_NOT_FOUND' }, { status: 404 })
   }
 
-  const attacker_debuffed = (launcherCountryData?.damage_percent ?? 0) >= 100
+  // BLACKOUT check
+  const attackedUntil = (playerData as Record<string, unknown>).attacked_until as string | null
+  if (attackedUntil && new Date(attackedUntil) > new Date()) {
+    return NextResponse.json({ error: 'Your nation is under blackout', code: 'BLACKOUT' }, { status: 403 })
+  }
+
+  // ATTACKER_CRITICAL check
+  const attackerDefenseRating = (launcherCountryData as Record<string, unknown> | null)?.defense_rating as number ?? 100
+  if (attackerDefenseRating <= 10) {
+    return NextResponse.json({ error: 'Your nation is in critical defense state', code: 'ATTACKER_CRITICAL' }, { status: 403 })
+  }
+
+  // DEFENSE_CRITICAL check (target)
+  const targetDefenseRating = (targetCountryData as Record<string, unknown> | null)?.defense_rating as number ?? 100
+  if (targetDefenseRating <= 10) {
+    return NextResponse.json({ error: 'Target nation is in critical defense state', code: 'DEFENSE_CRITICAL' }, { status: 403 })
+  }
+
+  const attacker_debuffed = ((launcherCountryData as Record<string, unknown> | null)?.damage_percent as number ?? 0) >= 100
 
   const ammoField = isNuke ? 'nukes_remaining' : 'missiles_remaining'
   const currentAmmo = isNuke
@@ -138,6 +158,14 @@ export async function POST(req: NextRequest) {
       .eq('id', launcher_id)
     return NextResponse.json({ error: 'LAUNCH_FAILED' }, { status: 500 })
   }
+
+  // Launcher country defense recovers on attack (fire-and-forget, don't block response)
+  const launchDelta = qty * (isNuke ? 10 : 0.1)
+  void Promise.resolve(supabase.rpc('update_country_defense', {
+    p_code:      launcher_country,
+    p_dr_change:  launchDelta,
+    p_dp_change: -launchDelta,
+  })).catch(() => {})
 
   // Breaking news
   const weaponLabel = isNuke ? 'nuclear warhead(s)' : 'missile(s)'

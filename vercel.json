@@ -12,6 +12,10 @@
     {
       "path": "/api/cron/chat-cleanup",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/recovery",
+      "schedule": "0 * * * *"
     }
   ]
 }

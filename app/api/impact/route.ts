@@ -31,10 +31,11 @@ export async function POST(req: NextRequest) {
   // Capture prev damage BEFORE any update (accurate only for the first caller)
   const { data: prevCountry } = await supabase
     .from('countries')
-    .select('damage_percent')
+    .select('damage_percent, defense_rating')
     .eq('code', target_country as string)
     .single()
-  const prev_damage_percent: number = prevCountry?.damage_percent ?? 0
+  const prev_damage_percent: number = (prevCountry as Record<string, unknown>)?.damage_percent as number ?? 0
+  const prev_defense_rating: number = (prevCountry as Record<string, unknown>)?.defense_rating as number ?? 100
 
   // Idempotency: mark as hit only if still flying
   const { data: updated, error: updateError } = await supabase
@@ -104,32 +105,42 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // Atomic damage increment — avoids read-then-write race when multiple missiles
-  // land on the same country simultaneously.
-  const weight = (missile.type as string) === 'nuke' ? 50 : 1
+  // Atomic defense/damage update — missile: ±0.1 per shot, nuke: ±10 per shot
+  const weight = (missile.type as string) === 'nuke' ? 10 : 0.1
   const debuffed = (missile as Record<string, unknown>).attacker_debuffed === true
   const alliance_reduction = ((missile as Record<string, unknown>).alliance_reduction as number) ?? 0
   const baseDelta = debuffed
-    ? Math.max(1, Math.floor((missile.quantity as number) * weight * 0.5))
+    ? (missile.quantity as number) * weight * 0.5
     : (missile.quantity as number) * weight
   const delta = alliance_reduction > 0
-    ? Math.max(1, Math.floor(baseDelta * (1 - alliance_reduction / 100)))
+    ? baseDelta * (1 - alliance_reduction / 100)
     : baseDelta
 
   const { data: dmgRows, error: countryUpdateError } = await supabase
-    .rpc('increment_country_damage', {
-      p_code:  target_country as string,
-      p_delta: delta,
+    .rpc('update_country_defense', {
+      p_code:      target_country as string,
+      p_dr_change: -delta,  // defense goes down on hit
+      p_dp_change:  delta,  // damage goes up on hit
     })
 
   if (countryUpdateError) {
-    console.error('[impact] damage increment failed:', countryUpdateError)
+    console.error('[impact] damage update failed:', countryUpdateError)
   }
 
   const dmgRow = Array.isArray(dmgRows) && dmgRows.length > 0
-    ? (dmgRows[0] as { new_stack: number; new_percent: number })
+    ? (dmgRows[0] as { new_damage_percent: number; new_defense_rating: number })
     : null
-  const new_damage_percent: number = dmgRow ? Number(dmgRow.new_percent) : prev_damage_percent
+  const new_damage_percent: number = dmgRow ? Number(dmgRow.new_damage_percent) : prev_damage_percent
+  const new_defense_rating: number = dmgRow ? Number(dmgRow.new_defense_rating) : prev_defense_rating
+
+  // Nuke BLACKOUT: defense hit 0 → lock all players in target country for 2 hours
+  if ((missile.type as string) === 'nuke' && new_defense_rating <= 0) {
+    const attackedUntil = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString()
+    await supabase
+      .from('players')
+      .update({ attacked_until: attackedUntil })
+      .eq('country_code', target_country)
+  }
 
   // First time reaching 100% — broadcast DESTROYED news
   if (prev_damage_percent < 100 && new_damage_percent >= 100) {
@@ -191,6 +202,7 @@ export async function POST(req: NextRequest) {
     alliance_reduction,
     prev_damage_percent,
     new_damage_percent,
+    new_defense_rating,
     old_rank,
     new_rank,
   })

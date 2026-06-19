@@ -178,6 +178,10 @@ export default function Home() {
   const pushEventRef = useRef(pushEvent)
   pushEventRef.current = pushEvent
 
+  const [defenseAlert, setDefenseAlert] = useState<{ message: string; color: string } | null>(null)
+  const defenseAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevDefenseRatingRef = useRef<Record<string, number>>({})
+
   // ── Defense system state ──────────────────────────────────────────────────
   const [shieldActive, setShieldActive] = useState(false)
   const [shieldActivating, setShieldActivating] = useState(false)
@@ -284,13 +288,16 @@ export default function Home() {
       const supabase = createClient()
       const todayUTC = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z'
       const [{ data: countryData }, { count: todayStrikes }, { data: briefRow }] = await Promise.all([
-        supabase.from('countries').select('code, name, flag, damage_stack, damage_percent, online_users'),
+        supabase.from('countries').select('code, name, flag, damage_stack, damage_percent, defense_rating, online_users'),
         supabase.from('missiles').select('*', { count: 'exact', head: true }).gte('launched_at', todayUTC),
         supabase.from('news_feed').select('content').eq('type', 'daily_brief').gte('created_at', todayUTC).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ])
       if (countryData) {
         const map: Record<string, CountryRow> = {}
-        countryData.forEach(c => { map[c.code] = c as CountryRow })
+        countryData.forEach(c => {
+          map[c.code] = c as CountryRow
+          prevDefenseRatingRef.current[c.code] = (c as CountryRow).defense_rating ?? 100
+        })
         setCountries(map)
       }
       if (todayStrikes != null) setStrikeCount(todayStrikes)
@@ -307,7 +314,7 @@ export default function Home() {
         const { strikes, date } = JSON.parse(saved)
         const today = new Date().toISOString().slice(0, 10)
         if (date === today) {
-          setDamagedRankings(strikes)
+          setDamagedRankings((strikes as typeof strikes).slice(0, 3))
         } else {
           localStorage.removeItem('ghostwar_recent_strikes')
         }
@@ -433,6 +440,34 @@ export default function Home() {
 
   const onCountryUpdate = useCallback((country: CountryRow) => {
     setCountries(prev => ({ ...prev, [country.code]: country }))
+
+    // STEP 7: defense_rating change alerts for player's own country
+    const myCountry = defenseStateRef.current.player?.country_code
+    if (myCountry && country.code === myCountry) {
+      const prevDr = prevDefenseRatingRef.current[country.code] ?? country.defense_rating ?? 100
+      const nextDr = country.defense_rating ?? 100
+
+      let alert: { message: string; color: string } | null = null
+      let duration = 5000
+      if (nextDr <= 0) {
+        alert = { message: '☢️ NATION BLACKOUT — Attack capability disabled for 2 hours', color: '#FF8800' }
+        duration = 10000
+      } else if (nextDr <= 10 && prevDr > 10) {
+        alert = { message: '⚠️ CRITICAL DEFENSE — Your nation cannot be targeted or launch attacks', color: '#FF2233' }
+        duration = 5000
+      } else if (nextDr > 10 && prevDr <= 10) {
+        alert = { message: '✅ DEFENSE RESTORED — Attack capability restored', color: '#00FF88' }
+        duration = 3000
+      }
+
+      if (alert) {
+        if (defenseAlertTimerRef.current) clearTimeout(defenseAlertTimerRef.current)
+        setDefenseAlert(alert)
+        defenseAlertTimerRef.current = setTimeout(() => setDefenseAlert(null), duration)
+      }
+
+      prevDefenseRatingRef.current[country.code] = nextDr
+    }
   }, [])
 
   useRealtimeMissiles({ onMissile, onNews, onCountryUpdate })
@@ -687,12 +722,26 @@ export default function Home() {
       betrayal?: boolean
       alliance_reduction?: number
       error?: string
+      code?: string
     }>).catch(() => null)
 
     await new Promise<void>(resolve => setTimeout(resolve, 800))
 
     try {
       const data = await apiPromise
+      if (data && !data.success && data.code) {
+        const msg = data.code === 'DEFENSE_CRITICAL' ? '⚠️ TARGET NATION CRITICAL — Cannot strike'
+          : data.code === 'ATTACKER_CRITICAL' ? '⚠️ YOUR NATION CRITICAL — Cannot launch'
+          : data.code === 'BLACKOUT' ? '⚠️ NATION BLACKOUT — Attack disabled for 2 hours'
+          : null
+        if (msg) {
+          const color = data.code === 'BLACKOUT' ? '#FF8800' : '#FF2233'
+          if (defenseAlertTimerRef.current) clearTimeout(defenseAlertTimerRef.current)
+          setDefenseAlert({ message: msg, color })
+          defenseAlertTimerRef.current = setTimeout(() => setDefenseAlert(null), 5000)
+        }
+        return
+      }
       if (data?.success && data.flight_seconds) {
         const toCoords = COUNTRY_COORDS[targetCountry]
         if (fromCoords && toCoords) {
@@ -773,6 +822,20 @@ export default function Home() {
       {interceptAlert && (
         <div className="fixed top-12 left-1/2 -translate-x-1/2 z-40 px-4 py-2 border border-[#FF2233] bg-[#FF2233]/10 neon-glow text-xs tracking-widest">
           {interceptAlert}
+        </div>
+      )}
+
+      {defenseAlert && (
+        <div
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-40 px-4 py-2 text-xs tracking-widest"
+          style={{
+            border: `1px solid ${defenseAlert.color}`,
+            background: `${defenseAlert.color}18`,
+            color: defenseAlert.color,
+            boxShadow: `0 0 8px ${defenseAlert.color}44`,
+          }}
+        >
+          {defenseAlert.message}
         </div>
       )}
 
@@ -1491,16 +1554,19 @@ export default function Home() {
             </div>
             <div className="text-zinc-400 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
             {(() => {
-              const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
-              const rating = Math.round(100 - dmg)
+              const rating = Math.round(player?.country_code ? (countries[player.country_code]?.defense_rating ?? 100) : 100)
+              const isCritical = rating <= 10
               const filled = Math.min(5, Math.round(rating / 20))
               return (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#FF2233] transition-all duration-700" style={{ width: `${rating}%` }} />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#FF2233] transition-all duration-700" style={{ width: `${rating}%` }} />
+                    </div>
+                    <span className="text-[#FF2233] text-[10px]">{rating}%</span>
+                    <span className="text-[#FF2233] text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
                   </div>
-                  <span className="text-[#FF2233] text-[10px]">{rating}%</span>
-                  <span className="text-[#FF2233] text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
+                  {isCritical && <div className="text-[#FF2233] text-[9px] tracking-widest mt-1">⚠️ CRITICAL</div>}
                 </div>
               )
             })()}
@@ -1535,16 +1601,19 @@ export default function Home() {
           <div className="pointer-events-auto p-3" style={CARD}>
             <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
             {(() => {
-              const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
-              const rating = Math.round(100 - dmg)
+              const rating = Math.round(player?.country_code ? (countries[player.country_code]?.defense_rating ?? 100) : 100)
+              const isCritical = rating <= 10
               const filled = Math.min(5, Math.round(rating / 20))
               return (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#00FFAA] transition-all duration-700" style={{ width: `${rating}%` }} />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#00FFAA] transition-all duration-700" style={{ width: `${rating}%` }} />
+                    </div>
+                    <span className="text-zinc-300 text-[10px]">{rating}%</span>
+                    <span className="text-zinc-400 text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
                   </div>
-                  <span className="text-zinc-300 text-[10px]">{rating}%</span>
-                  <span className="text-zinc-400 text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
+                  {isCritical && <div className="text-[#FF2233] text-[9px] tracking-widest mt-1">⚠️ CRITICAL</div>}
                 </div>
               )
             })()}

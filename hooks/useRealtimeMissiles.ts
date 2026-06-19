@@ -31,6 +31,7 @@ export interface CountryRow {
   flag: string
   damage_stack: number
   damage_percent: number
+  defense_rating: number
   online_users: number
 }
 
