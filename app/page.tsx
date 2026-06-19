@@ -1571,7 +1571,7 @@ export default function Home() {
               ▶ Restock here when out of ammo
             </div>
           )}
-          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">ARSENAL SUPPLY</div>
+          <div className="text-zinc-300 text-[10px] tracking-widest mb-2">🚀 ARSENAL SUPPLY</div>
           <div className="flex gap-1 mb-1.5">
             <input
               type="text"
