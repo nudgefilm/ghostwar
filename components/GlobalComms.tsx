@@ -40,10 +40,8 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
   const [allianceIds, setAllianceIds] = useState<Record<string, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  // Tracks outgoing messages to dedup when Realtime echoes them back
-  const pendingRef = useRef<Set<string>>(new Set())
 
-  // Fetch alliance IDs for tab filtering
+  // Fetch alliance IDs for tab UI
   useEffect(() => {
     const supabase = createClient()
     supabase.from('alliances_meta').select('id, name').then(({ data }) => {
@@ -65,61 +63,6 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
 
   const selectedAllianceId = allianceIds[activeTab]
 
-  // Load 50 most recent messages for the active alliance tab
-  useEffect(() => {
-    if (!selectedAllianceId) return
-    const supabase = createClient()
-    setMessages([])
-    supabase
-      .from('chat_messages')
-      .select('id, nickname, country_code, message, created_at, alliance_id')
-      .eq('alliance_id', selectedAllianceId)
-      .order('created_at', { ascending: true })
-      .limit(MAX_MESSAGES)
-      .then(({ data }) => {
-        if (data) setMessages(data as ChatMessage[])
-      })
-  }, [selectedAllianceId])
-
-  // Realtime subscription — scoped to active alliance tab
-  useEffect(() => {
-    if (!selectedAllianceId) return
-    const supabase = createClient()
-    const channel = supabase
-      .channel(`global-comms-${selectedAllianceId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `alliance_id=eq.${selectedAllianceId}`,
-        },
-        (payload) => {
-          const incoming = payload.new as ChatMessage
-          const key = `${incoming.nickname}:${incoming.message}`
-          if (pendingRef.current.has(key)) {
-            // Own message echoed back — replace optimistic entry with real one
-            pendingRef.current.delete(key)
-            setMessages(prev =>
-              prev.map(m =>
-                m.id.startsWith('opt-') &&
-                m.nickname === incoming.nickname &&
-                m.message === incoming.message
-                  ? incoming
-                  : m,
-              ).slice(-MAX_MESSAGES),
-            )
-          } else {
-            setMessages(prev => [...prev, incoming].slice(-MAX_MESSAGES))
-          }
-        },
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [selectedAllianceId])
-
   // Scroll to bottom when expanded or new message arrives
   useEffect(() => {
     if (expanded && listRef.current) {
@@ -127,49 +70,26 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
     }
   }, [messages, expanded])
 
-  const send = async () => {
-    if (!player || !input.trim() || sending || !selectedAllianceId) return
+  const send = () => {
+    if (!player || !input.trim() || sending) return
     const msg = input.trim()
-    const key = `${player.nickname}:${msg}`
 
-    // Optimistic update — visible immediately
-    pendingRef.current.add(key)
     setMessages(prev => [...prev, {
-      id: `opt-${Date.now()}`,
+      id: `local-${Date.now()}`,
       nickname: player.nickname,
       country_code: player.country_code,
       message: msg,
       created_at: new Date().toISOString(),
-      alliance_id: selectedAllianceId,
+      alliance_id: selectedAllianceId ?? null,
     }].slice(-MAX_MESSAGES))
 
     setInput('')
     inputRef.current?.focus()
-    setSending(true)
-
-    try {
-      const res = await fetch('/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          player_id: player.id,
-          nickname: player.nickname,
-          country_code: player.country_code,
-          message: msg,
-          alliance_id: selectedAllianceId,
-        }),
-      })
-      if (!res.ok) {
-        const data = await res.json() as { error?: string }
-        console.error('[GlobalComms] send failed', data.error)
-      }
-    } finally {
-      setSending(false)
-    }
   }
 
-  // Visible messages: last N rows depending on expanded state
-  const visibleMessages = messages.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
+  // Messages visible in current tab (local messages tagged with this alliance, or untagged)
+  const visibleAll = messages.filter(m => !m.alliance_id || m.alliance_id === selectedAllianceId)
+  const visibleMessages = visibleAll.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
 
   // Per-row budget for max-height cap: text-[11px] leading-snug ≈ 14px + space-y-1.5 gap 6px
   const ROW_H = 22
@@ -225,7 +145,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
         </button>
       </div>
 
-      {/* Messages — max-height caps the box; content determines actual height (no empty gap) */}
+      {/* Messages */}
       <div
         ref={listRef}
         className="px-2.5 py-2 space-y-1.5"
@@ -237,7 +157,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
           scrollbarWidth: 'none',
         }}
       >
-        {messages.length === 0 && (
+        {visibleAll.length === 0 && (
           <div className="text-zinc-600 text-[11px]">No messages yet…</div>
         )}
         {visibleMessages.map(m => (
@@ -246,10 +166,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
             <span className="text-[#00FFAA] shrink-0 font-bold truncate max-w-[72px]">
               {m.nickname}:
             </span>
-            <span
-              className="break-all min-w-0"
-              style={{ color: m.id.startsWith('opt-') ? 'rgba(212,212,216,0.55)' : '#d4d4d8' }}
-            >
+            <span className="break-all min-w-0 text-zinc-300">
               {m.message}
             </span>
           </div>
@@ -289,7 +206,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
           className="text-[11px] tracking-wider disabled:opacity-30 hover:text-white transition-colors cursor-pointer shrink-0"
           style={{ color: '#00FFAA' }}
         >
-          {sending ? '···' : 'SEND'}
+          SEND
         </button>
       </div>
     </div>

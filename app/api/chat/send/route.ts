@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() }
   catch { return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 }) }
 
-  const { player_id, nickname, country_code, message, alliance_id } = body
+  const { player_id, nickname, country_code, message } = body
 
   if (!player_id || !nickname || !country_code || !message) {
     return NextResponse.json({ error: 'MISSING_FIELDS' }, { status: 400 })
@@ -29,21 +29,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 403 })
   }
 
-  const { error: insertError } = await supabase.from('chat_messages').insert({
-    nickname: player.nickname,
-    country_code: player.country_code,
-    message: msg,
-    ...(alliance_id ? { alliance_id: String(alliance_id) } : {}),
-  })
-
-  if (insertError) {
-    console.error('[chat/send] insert error', insertError)
-    return NextResponse.json({ error: insertError.message }, { status: 500 })
-  }
-
-  // Cleanup >24h messages — fire and forget, don't block response
+  // Insert message (cleanup of messages >24h is piggy-backed here)
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  supabase.from('chat_messages').delete().lt('created_at', cutoff).then()
+  await Promise.all([
+    supabase.from('chat_messages').insert({
+      nickname: player.nickname,
+      country_code: player.country_code,
+      message: msg,
+    }),
+    supabase.from('chat_messages').delete().lt('created_at', cutoff),
+  ])
 
   return NextResponse.json({ success: true })
 }

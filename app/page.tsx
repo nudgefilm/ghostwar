@@ -175,9 +175,6 @@ export default function Home() {
   const [infoModal, setInfoModal] = useState<'operator' | 'privacy' | 'terms' | null>(null)
   const [hofEntries, setHofEntries] = useState<{ nickname: string; country_code: string; action: string }[]>([])
   const [topTarget, setTopTarget] = useState<{ code: string; hits: number } | null>(null)
-  const [alliances, setAlliances] = useState<{ country_a: string; country_b: string; request_count: number; status: string }[]>([])
-  const [showAllianceDropdown, setShowAllianceDropdown] = useState(false)
-  const [allianceTarget, setAllianceTarget] = useState('')
   const [alliancesMeta, setAlliancesMeta] = useState<AllianceMeta[]>([])
   const [playerAllianceId, setPlayerAllianceId] = useState<string | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -416,26 +413,6 @@ export default function Home() {
     return () => clearInterval(id)
   }, [])
 
-  // ── Alliance data: fetch on login + poll every 30s ────────────────────────
-  const fetchAlliances = useCallback(() => {
-    if (!player?.country_code) return
-    createClient()
-      .from('alliances')
-      .select('country_a, country_b, request_count, status')
-      .or(`country_a.eq.${player.country_code},country_b.eq.${player.country_code}`)
-      .neq('status', 'broken')
-      .then(({ data }) => {
-        if (data) setAlliances(data as { country_a: string; country_b: string; request_count: number; status: string }[])
-      })
-  }, [player?.country_code])
-
-  useEffect(() => {
-    if (!player?.country_code) return
-    fetchAlliances()
-    const id = setInterval(fetchAlliances, 30_000)
-    return () => clearInterval(id)
-  }, [fetchAlliances])
-
   // ── Most-attacked nation today: poll every 30s ────────────────────────────
   useEffect(() => {
     const fetchTopTarget = () => {
@@ -564,36 +541,6 @@ export default function Home() {
     setDropdownOpen(false)
   }
 
-  const handleAllianceRequest = useCallback(async (targetCode: string) => {
-    if (!player) return
-    const [a, b] = [player.country_code, targetCode].sort()
-    await fetch('/api/alliance/request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ country_a: a, country_b: b }),
-    })
-    fetchAlliances()
-  }, [player, fetchAlliances])
-
-  const handleAllianceAccept = useCallback(async (a: string, b: string) => {
-    await fetch('/api/alliance/accept', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ country_a: a, country_b: b }),
-    })
-    fetchAlliances()
-    SoundEngine.playAlliance()
-  }, [fetchAlliances])
-
-  const handleAllianceBreak = useCallback(async (a: string, b: string) => {
-    await fetch('/api/alliance/break', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ country_a: a, country_b: b }),
-    })
-    fetchAlliances()
-  }, [fetchAlliances])
-
   const handleRedeem = async () => {
     if (!player || !redeemCode.trim() || isRedeeming) return
     SoundEngine.init()
@@ -718,7 +665,6 @@ export default function Home() {
         }
         if (data.betrayal) {
           pushEvent(`🚨 ALLIANCE BROKEN — betrayal strike on ${COUNTRY_NAMES[targetCountry] ?? targetCountry}`, 'alliance')
-          fetchAlliances()
         }
       }
     } finally {
@@ -728,12 +674,6 @@ export default function Home() {
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────
-  const myAlliances = player
-    ? alliances.filter(a => a.country_a === player.country_code || a.country_b === player.country_code)
-    : []
-  const pendingIncoming = myAlliances.filter(a => a.status === 'pending')
-  const activeAlliances = myAlliances.filter(a => a.status === 'active')
-
   const primaryThreat = incomingThreats.length > 0
     ? [...incomingThreats].sort(
         (a, b) => new Date(a.arrives_at).getTime() - new Date(b.arrives_at).getTime(),
