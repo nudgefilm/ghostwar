@@ -1636,9 +1636,7 @@ export default function Home() {
       </aside>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 left-0 right-0 z-10 flex items-center justify-center gap-2 py-1.5 pointer-events-none"
-        style={{ background: 'rgba(0,0,0,0.4)' }}
-      >
+      <footer className="fixed bottom-0 left-0 right-0 z-10 flex flex-row items-center justify-center gap-2 py-1.5 pointer-events-none">
         <span className="relative group pointer-events-auto">
           <span className="text-[9px] text-zinc-500 cursor-pointer" onClick={() => window.dispatchEvent(new Event('ghostwar:shooting-star'))}>© 2026 Ghost War</span>
           <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150 pointer-events-none select-none">
