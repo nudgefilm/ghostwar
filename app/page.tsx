@@ -1302,7 +1302,7 @@ export default function Home() {
       </aside>
 
       {/* ══ RIGHT PANEL ══ */}
-      <aside className="fixed right-0 top-10 bottom-0 z-10 w-64 flex flex-col gap-2 p-2 pointer-events-none">
+      <aside className="fixed right-0 top-10 bottom-0 z-10 w-64 flex flex-col gap-2 p-2 pointer-events-none overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
 
         {/* DAILY BRIEF — pinned above LIVE STRIKES when available */}
         {dailyBrief && (

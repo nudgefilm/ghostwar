@@ -86,3 +86,8 @@ body {
 .tutorial-highlight {
   animation: tutorial-highlight-pulse 0.75s ease-in-out infinite;
 }
+
+/* Hide scrollbar on right sidebar while keeping scroll functional */
+aside::-webkit-scrollbar {
+  display: none;
+}
