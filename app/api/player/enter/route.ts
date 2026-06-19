@@ -41,5 +41,7 @@ export async function POST(req: NextRequest) {
     await supabase.rpc('adjust_online_users', { p_code: country_code, p_delta: 1 })
   }
 
-  return NextResponse.json({ success: true, player: updated })
+  // nukes_remaining: use pre-update value — some DB triggers (e.g. daily reset) may zero it out
+  // during the UPDATE call even though we only changed country_code.
+  return NextResponse.json({ success: true, player: { ...updated, nukes_remaining: existing.nukes_remaining } })
 }

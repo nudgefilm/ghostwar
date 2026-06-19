@@ -288,9 +288,10 @@ export default function Home() {
     const loadCountries = async () => {
       const supabase = createClient()
       const todayUTC = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z'
-      const [{ data: countryData }, { count: todayStrikes }, { data: briefRow }] = await Promise.all([
+      const [{ data: countryData }, { count: todayStrikes }, { count: todayNukes }, { data: briefRow }] = await Promise.all([
         supabase.from('countries').select('code, name, flag, damage_stack, damage_percent, defense_rating, online_users'),
         supabase.from('missiles').select('*', { count: 'exact', head: true }).gte('launched_at', todayUTC),
+        supabase.from('missiles').select('*', { count: 'exact', head: true }).eq('type', 'nuke').gte('launched_at', todayUTC),
         supabase.from('news_feed').select('content').eq('type', 'daily_brief').gte('created_at', todayUTC).order('created_at', { ascending: false }).limit(1).maybeSingle(),
       ])
       if (countryData) {
@@ -302,6 +303,7 @@ export default function Home() {
         setCountries(map)
       }
       if (todayStrikes != null) setStrikeCount(todayStrikes)
+      if (todayNukes != null) setNukeCount(todayNukes)
       if (briefRow?.content) setDailyBrief(briefRow.content)
     }
     loadCountries()
@@ -347,24 +349,18 @@ export default function Home() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nickname: p.nickname, country_code: p.country_code }),
         })
-        const json = await res.json() as { success?: boolean; player?: Player; error?: string }
+        const json = await res.json() as { success?: boolean; player?: Player & { missiles_remaining?: number; nukes_remaining?: number }; error?: string }
         if (!json.player) {
           localStorage.removeItem('ghostwar_player')
           return
         }
-        const restored = json.player
+        const { missiles_remaining, nukes_remaining, ...playerFields } = json.player
+        const restored: Player = playerFields
         setPlayer(restored)
         try { localStorage.setItem('ghostwar_player', JSON.stringify(restored)) } catch { /* ignore */ }
 
-        const { data } = await createClient()
-          .from('players')
-          .select('missiles_remaining, nukes_remaining')
-          .eq('id', restored.id)
-          .single()
-        if (data) {
-          setMissiles(data.missiles_remaining)
-          setNukes(data.nukes_remaining)
-        }
+        setMissiles(missiles_remaining ?? 20)
+        setNukes(nukes_remaining ?? 0)
       } catch {
         localStorage.removeItem('ghostwar_player')
       }
