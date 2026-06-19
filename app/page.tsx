@@ -1094,12 +1094,36 @@ export default function Home() {
           <div className="text-zinc-300 text-[10px] tracking-widest mb-2">OPERATOR</div>
           {player ? (
             <>
-              <div className="flex items-center gap-2 mb-2">
-                <TwemojiFlag code={player.country_code} size={32} />
-                <div>
-                  <div className="text-zinc-200 text-sm font-bold tracking-wide">{player.nickname}</div>
-                  <div className="text-zinc-200 text-sm">{COUNTRY_NAMES[player.country_code]}</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <TwemojiFlag code={player.country_code} size={32} />
+                  <div>
+                    <div className="text-zinc-200 text-sm font-bold tracking-wide">{player.nickname}</div>
+                    <div className="text-zinc-200 text-sm">{COUNTRY_NAMES[player.country_code]}</div>
+                  </div>
                 </div>
+                {(() => {
+                  if (!playerAllianceId) return null
+                  const alliance = alliancesMeta.find(a => a.id === playerAllianceId)
+                  if (!alliance) return null
+                  const imgMap: Record<string, string> = {
+                    'GHOST LEGION': '/images/alliances/ghost-legion.jpeg',
+                    'PHANTOM ORDER': '/images/alliances/phantom-order.jpeg',
+                  }
+                  const src = imgMap[alliance.name]
+                  if (!src) return null
+                  return (
+                    <img
+                      src={src}
+                      alt={alliance.name}
+                      className="w-10 h-10 rounded-full object-cover"
+                      style={{
+                        outline: `1px solid ${alliance.color}`,
+                        boxShadow: `0 0 8px ${alliance.color}`,
+                      }}
+                    />
+                  )
+                })()}
               </div>
               <div className="flex items-center gap-4 text-[10px]">
                 <span className="text-zinc-200">🚀 <span className="text-green-400 font-bold">{missiles}</span></span>
