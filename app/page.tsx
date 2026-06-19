@@ -1246,103 +1246,6 @@ export default function Home() {
           </button>
         </div>
 
-        {/* DEFENSE */}
-        {primaryThreat ? (
-          <div
-            className="pointer-events-auto p-3 animate-pulse"
-            style={{ ...CARD, background: 'rgba(255,34,51,0.15)', borderColor: 'rgba(255,34,51,0.5)' }}
-          >
-            <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold truncate">
-              ⚠️ WARNING: {primaryThreat.quantity} INBOUND FROM {primaryThreat.launcher_country}
-            </div>
-            <div className="text-zinc-400 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
-            {(() => {
-              const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
-              const rating = Math.round(100 - dmg)
-              const filled = Math.min(5, Math.round(rating / 20))
-              return (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#FF2233] transition-all duration-700" style={{ width: `${rating}%` }} />
-                  </div>
-                  <span className="text-[#FF2233] text-[10px]">{rating}%</span>
-                  <span className="text-[#FF2233] text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
-                </div>
-              )
-            })()}
-            {player && (
-              <button
-                className="mt-2 w-full text-[10px] tracking-widest py-1 px-2 bg-transparent transition-colors duration-200"
-                style={shieldActive
-                  ? { border: '1px solid #00FF88', color: '#00FF88' }
-                  : { border: '1px solid rgba(255,34,51,0.4)', color: 'rgba(255,34,51,0.7)' }}
-                disabled={shieldActive || shieldActivating}
-                onClick={async () => {
-                  if (shieldActivating) return
-                  setShieldActivating(true)
-                  try {
-                    const r = await fetch('/api/player/shield', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ player_id: player.id }),
-                    })
-                    const json = await r.json() as { success?: boolean }
-                    if (json.success) setShieldActive(true)
-                  } finally {
-                    setShieldActivating(false)
-                  }
-                }}
-              >
-                {shieldActivating ? 'ACTIVATING...' : shieldActive ? 'SHIELD ACTIVE' : 'ACTIVATE SHIELD'}
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="pointer-events-auto p-3" style={CARD}>
-            <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
-            {(() => {
-              const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
-              const rating = Math.round(100 - dmg)
-              const filled = Math.min(5, Math.round(rating / 20))
-              return (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-                    <div className="h-full bg-[#00FFAA] transition-all duration-700" style={{ width: `${rating}%` }} />
-                  </div>
-                  <span className="text-zinc-300 text-[10px]">{rating}%</span>
-                  <span className="text-zinc-400 text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
-                </div>
-              )
-            })()}
-            {player && (
-              <button
-                className="mt-2 w-full text-[10px] tracking-widest py-1 px-2 bg-transparent transition-colors duration-200"
-                style={shieldActive
-                  ? { border: '1px solid #00FF88', color: '#00FF88' }
-                  : { border: '1px solid rgba(0,255,170,0.3)', color: 'rgba(0,255,170,0.6)' }}
-                disabled={shieldActive || shieldActivating}
-                onClick={async () => {
-                  if (shieldActivating) return
-                  setShieldActivating(true)
-                  try {
-                    const r = await fetch('/api/player/shield', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ player_id: player.id }),
-                    })
-                    const json = await r.json() as { success?: boolean }
-                    if (json.success) setShieldActive(true)
-                  } finally {
-                    setShieldActivating(false)
-                  }
-                }}
-              >
-                {shieldActivating ? 'ACTIVATING...' : shieldActive ? 'SHIELD ACTIVE' : 'ACTIVATE SHIELD'}
-              </button>
-            )}
-          </div>
-        )}
-
         {/* ALLIANCES — only shown when logged in */}
         {player && (
           <div className="pointer-events-auto p-3" style={{ ...CARD, borderColor: 'rgba(0,255,170,0.22)' }}>
@@ -1512,6 +1415,103 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* DEFENSE */}
+        {primaryThreat ? (
+          <div
+            className="pointer-events-auto p-3 animate-pulse"
+            style={{ ...CARD, background: 'rgba(255,34,51,0.15)', borderColor: 'rgba(255,34,51,0.5)' }}
+          >
+            <div className="text-[#FF2233] text-[10px] tracking-widest mb-2 font-bold truncate">
+              ⚠️ WARNING: {primaryThreat.quantity} INBOUND FROM {primaryThreat.launcher_country}
+            </div>
+            <div className="text-zinc-400 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
+            {(() => {
+              const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
+              const rating = Math.round(100 - dmg)
+              const filled = Math.min(5, Math.round(rating / 20))
+              return (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#FF2233] transition-all duration-700" style={{ width: `${rating}%` }} />
+                  </div>
+                  <span className="text-[#FF2233] text-[10px]">{rating}%</span>
+                  <span className="text-[#FF2233] text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
+                </div>
+              )
+            })()}
+            {player && (
+              <button
+                className="mt-2 w-full text-[10px] tracking-widest py-1 px-2 bg-transparent transition-colors duration-200"
+                style={shieldActive
+                  ? { border: '1px solid #00FF88', color: '#00FF88' }
+                  : { border: '1px solid rgba(255,34,51,0.4)', color: 'rgba(255,34,51,0.7)' }}
+                disabled={shieldActive || shieldActivating}
+                onClick={async () => {
+                  if (shieldActivating) return
+                  setShieldActivating(true)
+                  try {
+                    const r = await fetch('/api/player/shield', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ player_id: player.id }),
+                    })
+                    const json = await r.json() as { success?: boolean }
+                    if (json.success) setShieldActive(true)
+                  } finally {
+                    setShieldActivating(false)
+                  }
+                }}
+              >
+                {shieldActivating ? 'ACTIVATING...' : shieldActive ? 'SHIELD ACTIVE' : 'ACTIVATE SHIELD'}
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="pointer-events-auto p-3" style={CARD}>
+            <div className="text-zinc-300 text-[10px] tracking-widest mb-2">DEFENSE SYSTEMS</div>
+            {(() => {
+              const dmg = player?.country_code ? (countries[player.country_code]?.damage_percent ?? 0) : 0
+              const rating = Math.round(100 - dmg)
+              const filled = Math.min(5, Math.round(rating / 20))
+              return (
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="h-full bg-[#00FFAA] transition-all duration-700" style={{ width: `${rating}%` }} />
+                  </div>
+                  <span className="text-zinc-300 text-[10px]">{rating}%</span>
+                  <span className="text-zinc-400 text-[9px] font-mono">{'█'.repeat(filled)}{'░'.repeat(5 - filled)}</span>
+                </div>
+              )
+            })()}
+            {player && (
+              <button
+                className="mt-2 w-full text-[10px] tracking-widest py-1 px-2 bg-transparent transition-colors duration-200"
+                style={shieldActive
+                  ? { border: '1px solid #00FF88', color: '#00FF88' }
+                  : { border: '1px solid rgba(0,255,170,0.3)', color: 'rgba(0,255,170,0.6)' }}
+                disabled={shieldActive || shieldActivating}
+                onClick={async () => {
+                  if (shieldActivating) return
+                  setShieldActivating(true)
+                  try {
+                    const r = await fetch('/api/player/shield', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ player_id: player.id }),
+                    })
+                    const json = await r.json() as { success?: boolean }
+                    if (json.success) setShieldActive(true)
+                  } finally {
+                    setShieldActivating(false)
+                  }
+                }}
+              >
+                {shieldActivating ? 'ACTIVATING...' : shieldActive ? 'SHIELD ACTIVE' : 'ACTIVATE SHIELD'}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ARSENAL SUPPLY — redeem Gumroad codes */}
         <div className={`pointer-events-auto p-3${tutorialStep === 5 ? ' tutorial-highlight' : ''}`} style={CARD}>
