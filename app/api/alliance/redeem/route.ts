@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const ALLIANCE_PACK_PRODUCT_ID = process.env.GUMROAD_ALLIANCE_PACK_PRODUCT_ID!
-
 export async function POST(req: NextRequest) {
   let body: Record<string, unknown>
   try { body = await req.json() }
@@ -15,19 +13,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Missing params' }, { status: 400 })
   }
 
-  const gumRes = await fetch('https://api.gumroad.com/v2/licenses/verify', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      product_id: ALLIANCE_PACK_PRODUCT_ID,
-      license_key,
-    }),
-  })
-
-  const gumData = await gumRes.json() as { success: boolean }
+  let gumData: { success: boolean; uses?: number; message?: string }
+  try {
+    const r = await fetch('https://api.gumroad.com/v2/licenses/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        product_id: 'bcqbei',
+        license_key,
+        increment_uses_count: 'true',
+      }).toString(),
+    })
+    gumData = await r.json() as typeof gumData
+  } catch (err) {
+    console.error('[alliance/redeem] fetch error', err)
+    return NextResponse.json({ error: 'GUMROAD_UNREACHABLE' }, { status: 502 })
+  }
 
   if (!gumData.success) {
     return NextResponse.json({ error: 'Invalid license key' }, { status: 400 })
+  }
+
+  if ((gumData.uses ?? 0) > 1) {
+    return NextResponse.json({ error: 'CODE_ALREADY_USED' }, { status: 409 })
   }
 
   const expires_at = new Date()
