@@ -120,8 +120,10 @@ export default function AllianceJoinCard({ playerId, currentAllianceId, alliance
                   boxShadow: `0 0 8px ${alliance.color}60`,
                 }}
               />
-              <span className="text-[10px] font-black tracking-[0.25em]" style={{ color: alliance.color }}>
-                {alliance.name}
+              <span className="text-[10px] font-black tracking-[0.25em] text-center leading-tight" style={{ color: alliance.color }}>
+                {alliance.name.split(' ').map((word, i) => (
+                  <span key={i} className="block">{word}</span>
+                ))}
               </span>
               <span className="text-zinc-500 text-[10px] tracking-wider">
                 {alliance.member_count.toLocaleString()} members
