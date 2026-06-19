@@ -200,16 +200,16 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
         position: 'fixed',
         left: 0,
         right: 0,
-        height: '2px',
-        background: 'rgba(255, 34, 51, 0.4)',
-        boxShadow: '0 0 6px 2px rgba(255, 34, 51, 0.25), 0 0 16px 4px rgba(255, 34, 51, 0.1)',
+        height: '1px',
+        background: 'rgba(255, 34, 51, 0.18)',
+        boxShadow: '0 0 4px 1px rgba(255, 34, 51, 0.1), 0 0 10px 2px rgba(255, 34, 51, 0.06)',
         pointerEvents: 'none',
-        zIndex: 50,
-        animation: 'neonScan 6s linear infinite',
+        zIndex: 3,
+        animation: 'neonScan 7s linear infinite',
       }} />
       <style>{`
         @keyframes neonScan {
-          0%   { top: -2px; }
+          0%   { top: -1px; }
           100% { top: 100vh; }
         }
       `}</style>
