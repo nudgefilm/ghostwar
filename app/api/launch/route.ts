@@ -161,11 +161,12 @@ export async function POST(req: NextRequest) {
 
   // Launcher country defense recovers on attack (fire-and-forget, don't block response)
   const launchDelta = qty * (isNuke ? 10 : 0.1)
-  void Promise.resolve(supabase.rpc('update_country_defense', {
-    p_code:      launcher_country,
-    p_dr_change:  launchDelta,
-    p_dp_change: -launchDelta,
-  })).catch(() => {})
+  const launchCurrentDp = ((launcherCountryData as Record<string, unknown> | null)?.damage_percent as number) ?? 0
+  const launchNewDr = Math.min(100, attackerDefenseRating + launchDelta)
+  const launchNewDp = Math.max(0, launchCurrentDp - launchDelta)
+  void Promise.resolve(
+    supabase.from('countries').update({ defense_rating: launchNewDr, damage_percent: launchNewDp }).eq('code', launcher_country)
+  ).catch(() => {})
 
   // Breaking news
   const weaponLabel = isNuke ? 'nuclear warhead(s)' : 'missile(s)'

@@ -116,22 +116,17 @@ export async function POST(req: NextRequest) {
     ? baseDelta * (1 - alliance_reduction / 100)
     : baseDelta
 
-  const { data: dmgRows, error: countryUpdateError } = await supabase
-    .rpc('update_country_defense', {
-      p_code:      target_country as string,
-      p_dr_change: -delta,  // defense goes down on hit
-      p_dp_change:  delta,  // damage goes up on hit
-    })
+  const new_damage_percent = Math.min(100, Math.max(0, prev_damage_percent + delta))
+  const new_defense_rating = Math.min(100, Math.max(0, prev_defense_rating - delta))
+
+  const { error: countryUpdateError } = await supabase
+    .from('countries')
+    .update({ damage_percent: new_damage_percent, defense_rating: new_defense_rating })
+    .eq('code', target_country)
 
   if (countryUpdateError) {
     console.error('[impact] damage update failed:', countryUpdateError)
   }
-
-  const dmgRow = Array.isArray(dmgRows) && dmgRows.length > 0
-    ? (dmgRows[0] as { new_damage_percent: number; new_defense_rating: number })
-    : null
-  const new_damage_percent: number = dmgRow ? Number(dmgRow.new_damage_percent) : prev_damage_percent
-  const new_defense_rating: number = dmgRow ? Number(dmgRow.new_defense_rating) : prev_defense_rating
 
   // Nuke BLACKOUT: defense hit 0 → lock all players in target country for 2 hours
   if ((missile.type as string) === 'nuke' && new_defense_rating <= 0) {

@@ -181,6 +181,7 @@ export default function Home() {
   const [defenseAlert, setDefenseAlert] = useState<{ message: string; color: string } | null>(null)
   const defenseAlertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevDefenseRatingRef = useRef<Record<string, number>>({})
+  const seenNewsIdsRef = useRef(new Set<string>())
 
   // ── Defense system state ──────────────────────────────────────────────────
   const [shieldActive, setShieldActive] = useState(false)
@@ -428,14 +429,20 @@ export default function Home() {
   )
 
   const onNews = useCallback((item: NewsFeedRow) => {
+    // Deduplicate by ID to prevent double-processing from overlapping polls
+    if (seenNewsIdsRef.current.has(item.id)) return
+    seenNewsIdsRef.current.add(item.id)
+
     if (item.type === 'daily_brief') {
       setDailyBrief(item.content)
       return
     }
-    // Dedup by target_country: remove existing entry for this country, prepend new one, cap at 5
-    setRecentStrikes(prev => [item, ...prev.filter(n => n.target_country !== item.target_country)].slice(0, 3))
-    setStrikeCount(prev => prev + 1)
-    if (item.content?.includes('nuclear')) setNukeCount(prev => prev + 1)
+    // STRIKES TODAY and LIVE STRIKES only count actual missile attack events
+    if (item.type === 'attack') {
+      setRecentStrikes(prev => [item, ...prev.filter(n => n.target_country !== item.target_country)].slice(0, 3))
+      setStrikeCount(prev => prev + 1)
+      if (item.content?.includes('nuclear')) setNukeCount(prev => prev + 1)
+    }
   }, [])
 
   const onCountryUpdate = useCallback((country: CountryRow) => {
