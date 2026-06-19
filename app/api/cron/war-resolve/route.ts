@@ -52,5 +52,30 @@ export async function GET(req: Request) {
     })
   )
 
-  return NextResponse.json({ resolved: results.length, results })
+  // Expire declared wars past their expires_at
+  const { data: expiredWars } = await supabase
+    .from('war_declarations')
+    .select('id, target_country')
+    .eq('status', 'declared')
+    .lt('expires_at', now)
+
+  const expiredResults = await Promise.all(
+    (expiredWars ?? []).map(async (war) => {
+      await supabase
+        .from('war_declarations')
+        .update({ status: 'expired' })
+        .eq('id', war.id)
+
+      await supabase.from('news_feed').insert({
+        content: `⚔️ CEASEFIRE — War against ${war.target_country as string} has ended.`,
+        target_country: war.target_country,
+        type: 'alliance_war',
+        is_template: false,
+      })
+
+      return { id: war.id, result: 'expired' }
+    })
+  )
+
+  return NextResponse.json({ resolved: results.length + expiredResults.length, results: [...results, ...expiredResults] })
 }

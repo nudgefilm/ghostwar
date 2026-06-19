@@ -16,7 +16,7 @@ import { SoundEngine } from '@/lib/sounds'
 import EventTicker, { useEventTicker } from '@/components/EventTicker'
 import GlobalComms from '@/components/GlobalComms'
 import AllianceJoinCard from '@/app/components/alliance/AllianceJoinCard'
-import type { AllianceMeta } from '@/types/alliance'
+import type { AllianceMeta, WarDeclaration } from '@/types/alliance'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Globe = dynamic(() => import('@/components/Globe'), { ssr: false }) as any
@@ -169,6 +169,12 @@ export default function Home() {
   const [topTarget, setTopTarget] = useState<{ code: string; hits: number } | null>(null)
   const [alliancesMeta, setAlliancesMeta] = useState<AllianceMeta[]>([])
   const [playerAllianceId, setPlayerAllianceId] = useState<string | null>(null)
+  const [declaredWar, setDeclaredWar] = useState<WarDeclaration | null>(null)
+  const [declaredWarKey, setDeclaredWarKey] = useState(0)
+  const [allianceCode, setAllianceCode] = useState('')
+  const [allianceCodeStatus, setAllianceCodeStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [isAllianceRedeeming, setIsAllianceRedeeming] = useState(false)
+  const [alliancePackExpiresAt, setAlliancePackExpiresAt] = useState<string | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { queue: tickerQueue, pushEvent, shift: shiftTicker } = useEventTicker()
@@ -195,18 +201,46 @@ export default function Home() {
       .then(({ data }) => { if (data) setAlliancesMeta(data as AllianceMeta[]) })
   }, [])
 
-  // ── Player alliance_id fetch (on player change) ───────────────────────────
+  // ── Player alliance_id + alliance pack fetch (on player change) ───────────
   useEffect(() => {
-    if (!player) { setPlayerAllianceId(null); return }
+    if (!player) { setPlayerAllianceId(null); setAlliancePackExpiresAt(null); return }
     createClient()
       .from('players')
-      .select('alliance_id')
+      .select('alliance_id, alliance_pack_expires_at')
       .eq('id', player.id)
       .maybeSingle()
       .then(({ data }) => {
-        setPlayerAllianceId((data as { alliance_id: string | null } | null)?.alliance_id ?? null)
+        const row = data as { alliance_id: string | null; alliance_pack_expires_at: string | null } | null
+        setPlayerAllianceId(row?.alliance_id ?? null)
+        setAlliancePackExpiresAt(row?.alliance_pack_expires_at ?? null)
       })
   }, [player])
+
+  // ── Declared war fetch ─────────────────────────────────────────────────────
+  useEffect(() => {
+    createClient()
+      .from('war_declarations')
+      .select('*')
+      .eq('status', 'declared')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => { setDeclaredWar(data as WarDeclaration | null) })
+  }, [declaredWarKey])
+
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel('war-decl-global')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'war_declarations' }, () => {
+        setDeclaredWarKey(k => k + 1)
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'war_declarations' }, () => {
+        setDeclaredWarKey(k => k + 1)
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -571,6 +605,37 @@ export default function Home() {
       setIsRedeeming(false)
     }
   }
+
+  const handleAllianceRedeem = async () => {
+    if (!player || !allianceCode.trim() || isAllianceRedeeming) return
+    setIsAllianceRedeeming(true)
+    setAllianceCodeStatus(null)
+    try {
+      const res = await fetch('/api/alliance/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player_id: player.id, license_key: allianceCode.trim() }),
+      })
+      const data = await res.json() as { success?: boolean; expires_at?: string; error?: string }
+      if (res.ok && data.success) {
+        const expiresAt = data.expires_at ?? null
+        setAlliancePackExpiresAt(expiresAt)
+        const dateStr = expiresAt ? new Date(expiresAt).toLocaleDateString() : ''
+        setAllianceCodeStatus({ type: 'success', message: `ALLIANCE PACK ACTIVATED — Expires: ${dateStr}` })
+        setAllianceCode('')
+      } else {
+        const msg = data.error === 'CODE_ALREADY_USED' ? 'CODE ALREADY USED'
+          : data.error === 'Invalid license key' ? 'INVALID LICENSE KEY'
+          : data.error ?? 'REDEMPTION FAILED'
+        setAllianceCodeStatus({ type: 'error', message: msg })
+      }
+    } catch {
+      setAllianceCodeStatus({ type: 'error', message: 'CONNECTION ERROR' })
+    } finally {
+      setIsAllianceRedeeming(false)
+    }
+  }
+
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -1367,6 +1432,17 @@ export default function Home() {
             <div className="text-[10px] font-mono text-zinc-200">
               ⏱ RESET IN {resetCountdown}
             </div>
+            {/* Active war declaration */}
+            {declaredWar && (() => {
+              const warAlliance = alliancesMeta.find(a => a.id === declaredWar.alliance_id)
+              const flag = COUNTRY_FLAGS[declaredWar.target_country] ?? ''
+              const countryName = COUNTRY_NAMES[declaredWar.target_country] ?? declaredWar.target_country
+              return (
+                <div className="text-[10px] font-mono font-bold tracking-wide" style={{ color: warAlliance?.color ?? '#FF2233' }}>
+                  ⚔️ {warAlliance?.name ?? 'ALLIANCE'} HAS DECLARED WAR ON {flag} {countryName}
+                </div>
+              )
+            })()}
           </div>
         </div>
 
@@ -1501,7 +1577,7 @@ export default function Home() {
               {redeemStatus.type === 'success' ? '✓' : '✗'} {redeemStatus.message}
             </div>
           )}
-          <div className="flex gap-2 text-[9px]">
+          <div className="flex gap-2 text-[9px] flex-wrap">
             <a href="https://nudgefilm.gumroad.com/l/tbyskm" target="_blank" rel="noopener noreferrer"
               className="text-zinc-300 hover:text-zinc-200 transition-colors">
               Get Missiles ($5) ▸
@@ -1511,6 +1587,49 @@ export default function Home() {
               className="text-zinc-300 hover:text-zinc-200 transition-colors">
               Get Bundle ($20) ▸
             </a>
+            <span className="text-zinc-400">│</span>
+            <a href="https://nudgefilm.gumroad.com/l/bcqbei" target="_blank" rel="noopener noreferrer"
+              className="text-zinc-300 hover:text-zinc-200 transition-colors">
+              Get Alliance Pack ($10) ▶
+            </a>
+          </div>
+
+          {/* Alliance Pack status / redeem */}
+          <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+            {alliancePackExpiresAt && new Date(alliancePackExpiresAt) > new Date() ? (
+              <div className="text-[9px] font-mono mb-1.5" style={{ color: '#00FFAA' }}>
+                ● ALLIANCE PACK — Expires: {new Date(alliancePackExpiresAt).toLocaleDateString()}
+              </div>
+            ) : (
+              <>
+                <div className="flex gap-1 mb-1">
+                  <input
+                    type="text"
+                    value={allianceCode}
+                    onChange={e => { setAllianceCode(e.target.value.toUpperCase()); setAllianceCodeStatus(null) }}
+                    onKeyDown={e => e.key === 'Enter' && handleAllianceRedeem()}
+                    placeholder="ALLIANCE CODE..."
+                    disabled={!player || isAllianceRedeeming}
+                    className="flex-1 min-w-0 bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1 font-mono tracking-wider placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 disabled:opacity-40"
+                  />
+                  <button
+                    onClick={handleAllianceRedeem}
+                    disabled={!player || !allianceCode.trim() || isAllianceRedeeming}
+                    className="px-2 py-1 text-[10px] tracking-widest border border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:text-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer shrink-0"
+                  >
+                    {isAllianceRedeeming ? '···' : 'REDEEM'}
+                  </button>
+                </div>
+              </>
+            )}
+            {allianceCodeStatus && (
+              <div
+                className="text-[9px] tracking-wider font-mono"
+                style={{ color: allianceCodeStatus.type === 'success' ? '#00FFAA' : '#FF2233' }}
+              >
+                {allianceCodeStatus.type === 'success' ? '✓' : '✗'} {allianceCodeStatus.message}
+              </div>
+            )}
           </div>
         </div>
 
