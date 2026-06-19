@@ -45,7 +45,6 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
   const [showWarModal, setShowWarModal] = useState(false)
   const [activeWar, setActiveWar] = useState<WarDeclaration | null>(null)
   const [hasVoted, setHasVoted] = useState(false)
-  const [hasWeapons, setHasWeapons] = useState(false)
   const [warRefreshKey, setWarRefreshKey] = useState(0)
   const [mounted, setMounted] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -72,21 +71,6 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
       setActiveTab(entry[0] as TabName)
     }
   }, [playerAllianceId, allianceIds])
-
-  // Check weapon availability for WAR DECLARATION
-  useEffect(() => {
-    if (!player) { setHasWeapons(false); return }
-    const supabase = createClient()
-    supabase
-      .from('players')
-      .select('missiles_remaining, nukes_remaining')
-      .eq('id', player.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        const row = data as { missiles_remaining?: number | null; nukes_remaining?: number | null } | null
-        setHasWeapons((row?.missiles_remaining ?? 0) > 0 || (row?.nukes_remaining ?? 0) > 0)
-      })
-  }, [player?.id])
 
   // Fetch active war for own alliance + hasVoted
   useEffect(() => {
@@ -269,10 +253,8 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
             {isOwnAllianceTab && (
               <div className="px-2.5 py-1.5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <button
-                  onClick={() => hasWeapons && setShowWarModal(true)}
-                  disabled={!hasWeapons}
-                  title={!hasWeapons ? 'Weapons required' : undefined}
-                  className="w-full py-1 text-[10px] font-black tracking-[0.2em] border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => setShowWarModal(true)}
+                  className="w-full py-1 text-[10px] font-black tracking-[0.2em] border transition-all cursor-pointer"
                   style={{
                     borderColor: `${allianceColor}60`,
                     color: allianceColor,
