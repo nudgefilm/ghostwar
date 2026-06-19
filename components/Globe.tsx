@@ -116,10 +116,16 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, sh
   const shieldActiveRef = useRef(shieldActive ?? false)
   useEffect(() => { shieldActiveRef.current = shieldActive ?? false }, [shieldActive])
   const warGlowMeshRef = useRef<THREE.Mesh | null>(null)
+  const warGlowTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // War glow ring — pulsing ring over declared-war target country
   useEffect(() => {
     const scene = sceneRef.current
+    // Clear any pending auto-remove timer
+    if (warGlowTimerRef.current !== null) {
+      clearTimeout(warGlowTimerRef.current)
+      warGlowTimerRef.current = null
+    }
     // Remove previous ring
     if (warGlowMeshRef.current) {
       scene?.remove(warGlowMeshRef.current)
@@ -153,8 +159,31 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, sh
       return true
     })
 
+    // Auto-remove after 1 hour with fade-out
+    warGlowTimerRef.current = setTimeout(() => {
+      warGlowTimerRef.current = null
+      running = false
+      if (!warGlowMeshRef.current) return
+      const fadeStart = performance.now()
+      animsRef.current.push(() => {
+        if (!warGlowMeshRef.current) return false
+        const p = Math.min((performance.now() - fadeStart) / 1000, 1)
+        mat.opacity = 0.85 * (1 - p)
+        if (p < 1) return true
+        scene.remove(warGlowMeshRef.current)
+        warGlowMeshRef.current.geometry.dispose()
+        ;(warGlowMeshRef.current.material as THREE.Material).dispose()
+        warGlowMeshRef.current = null
+        return false
+      })
+    }, 3600000)
+
     return () => {
       running = false
+      if (warGlowTimerRef.current !== null) {
+        clearTimeout(warGlowTimerRef.current)
+        warGlowTimerRef.current = null
+      }
       if (warGlowMeshRef.current) {
         scene.remove(warGlowMeshRef.current)
         warGlowMeshRef.current.geometry.dispose()
