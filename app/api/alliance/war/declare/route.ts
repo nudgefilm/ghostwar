@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   const { data: player } = await supabase
     .from('players')
-    .select('alliance_id, alliance_pack_expires_at')
+    .select('alliance_id, missiles_remaining, nukes_remaining')
     .eq('id', player_id)
     .maybeSingle()
 
@@ -27,12 +27,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not in an alliance' }, { status: 403 })
   }
 
-  const packValid =
-    player.alliance_pack_expires_at &&
-    new Date(player.alliance_pack_expires_at as string) > new Date()
+  const hasWeapons =
+    (player.missiles_remaining as number) > 0 ||
+    (player.nukes_remaining as number) > 0
 
-  if (!packValid) {
-    return NextResponse.json({ error: 'Alliance Pack required' }, { status: 403 })
+  if (!hasWeapons) {
+    return NextResponse.json({ error: 'Weapons required to declare war' }, { status: 403 })
   }
 
   const todayStart = new Date()

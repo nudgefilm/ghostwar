@@ -45,7 +45,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
   const [showWarModal, setShowWarModal] = useState(false)
   const [activeWar, setActiveWar] = useState<WarDeclaration | null>(null)
   const [hasVoted, setHasVoted] = useState(false)
-  const [hasAlliancePack, setHasAlliancePack] = useState(false)
+  const [hasWeapons, setHasWeapons] = useState(false)
   const [warRefreshKey, setWarRefreshKey] = useState(0)
   const [mounted, setMounted] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -73,18 +73,18 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
     }
   }, [playerAllianceId, allianceIds])
 
-  // Check alliance pack validity
+  // Check weapon availability for WAR DECLARATION
   useEffect(() => {
-    if (!player) { setHasAlliancePack(false); return }
+    if (!player) { setHasWeapons(false); return }
     const supabase = createClient()
     supabase
       .from('players')
-      .select('alliance_pack_expires_at')
+      .select('missiles_remaining, nukes_remaining')
       .eq('id', player.id)
       .maybeSingle()
       .then(({ data }) => {
-        const exp = (data as { alliance_pack_expires_at?: string | null } | null)?.alliance_pack_expires_at
-        setHasAlliancePack(!!exp && new Date(exp) > new Date())
+        const row = data as { missiles_remaining?: number | null; nukes_remaining?: number | null } | null
+        setHasWeapons((row?.missiles_remaining ?? 0) > 0 || (row?.nukes_remaining ?? 0) > 0)
       })
   }, [player?.id])
 
@@ -250,9 +250,9 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
             {isOwnAllianceTab && (
               <div className="px-2.5 py-1.5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <button
-                  onClick={() => hasAlliancePack && setShowWarModal(true)}
-                  disabled={!hasAlliancePack}
-                  title={!hasAlliancePack ? 'Alliance Pack required' : undefined}
+                  onClick={() => hasWeapons && setShowWarModal(true)}
+                  disabled={!hasWeapons}
+                  title={!hasWeapons ? 'Weapons required' : undefined}
                   className="w-full py-1 text-[10px] font-black tracking-[0.2em] border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   style={{
                     borderColor: `${allianceColor}60`,
