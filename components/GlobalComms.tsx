@@ -144,6 +144,13 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
   const allianceColor = ownTab?.color ?? '#FF2233'
   const allianceName = ownTab?.name ?? ''
 
+  // Auto-expand and switch to own tab when a war becomes active
+  useEffect(() => {
+    if (!activeWar) return
+    if (ownTab) setActiveTab(ownTab.name)
+    setExpanded(true)
+  }, [activeWar]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Scroll to bottom when expanded or new message arrives
   useEffect(() => {
     if (expanded && listRef.current) {
@@ -168,12 +175,10 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
     inputRef.current?.focus()
   }
 
-  // Messages visible in current tab
-  const visibleAll = messages.filter(m => !m.alliance_id || m.alliance_id === selectedAllianceId)
-  const visibleMessages = visibleAll.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
-
-  const ROW_H = 22
-  const maxH = (expanded ? EXPANDED_ROWS : COLLAPSED_ROWS) * ROW_H + 16
+  // Messages visible in current tab (only used when expanded)
+  const visibleMessages = messages
+    .filter(m => !m.alliance_id || m.alliance_id === selectedAllianceId)
+    .slice(-EXPANDED_ROWS)
 
   return (
     <>
@@ -238,101 +243,104 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
           </button>
         </div>
 
-        {/* WAR DECLARATION button — own alliance tab only */}
-        {isOwnAllianceTab && (
-          <div className="px-2.5 py-1.5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-            <button
-              onClick={() => hasAlliancePack && setShowWarModal(true)}
-              disabled={!hasAlliancePack}
-              title={!hasAlliancePack ? 'Alliance Pack required' : undefined}
-              className="w-full py-1 text-[10px] font-black tracking-[0.2em] border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+        {/* Expanded content — hidden when collapsed */}
+        {expanded && (
+          <>
+            {/* WAR DECLARATION button — own alliance tab only */}
+            {isOwnAllianceTab && (
+              <div className="px-2.5 py-1.5 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <button
+                  onClick={() => hasAlliancePack && setShowWarModal(true)}
+                  disabled={!hasAlliancePack}
+                  title={!hasAlliancePack ? 'Alliance Pack required' : undefined}
+                  className="w-full py-1 text-[10px] font-black tracking-[0.2em] border transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{
+                    borderColor: `${allianceColor}60`,
+                    color: allianceColor,
+                    backgroundColor: `${allianceColor}10`,
+                  }}
+                >
+                  ⚔ WAR DECLARATION
+                </button>
+              </div>
+            )}
+
+            {/* WarVoteBar — own alliance tab only, when voting war exists */}
+            {isOwnAllianceTab && activeWar && player && (
+              <div className="px-2.5 pt-2 shrink-0">
+                <WarVoteBar
+                  war={activeWar}
+                  playerId={player.id}
+                  allianceColor={allianceColor}
+                  hasVoted={hasVoted}
+                />
+              </div>
+            )}
+
+            {/* Messages */}
+            <div
+              ref={listRef}
+              className="px-2.5 py-2 space-y-1.5"
               style={{
-                borderColor: `${allianceColor}60`,
-                color: allianceColor,
-                backgroundColor: `${allianceColor}10`,
+                maxHeight: `${EXPANDED_ROWS * 22 + 16}px`,
+                overflowY: 'auto',
+                scrollbarWidth: 'none',
               }}
             >
-              ⚔ WAR DECLARATION
-            </button>
-          </div>
-        )}
-
-        {/* WarVoteBar — own alliance tab only, when voting war exists */}
-        {isOwnAllianceTab && activeWar && player && (
-          <div className="px-2.5 pt-2 shrink-0">
-            <WarVoteBar
-              war={activeWar}
-              playerId={player.id}
-              allianceColor={allianceColor}
-              hasVoted={hasVoted}
-            />
-          </div>
-        )}
-
-        {/* Messages */}
-        <div
-          ref={listRef}
-          className="px-2.5 py-2 space-y-1.5"
-          style={{
-            maxHeight: `${maxH}px`,
-            overflow: 'hidden',
-            overflowY: expanded ? 'auto' : 'hidden',
-            transition: 'max-height 0.22s ease',
-            scrollbarWidth: 'none',
-          }}
-        >
-          {visibleAll.length === 0 && (
-            <div className="text-zinc-600 text-[11px]">No messages yet…</div>
-          )}
-          {visibleMessages.map(m => (
-            <div key={m.id} className="flex items-start gap-1.5 text-[11px] leading-snug">
-              <TwemojiFlag code={m.country_code} size={11} className="shrink-0 mt-px" />
-              <span className="text-[#00FFAA] shrink-0 font-bold truncate max-w-[72px]">
-                {m.nickname}:
-              </span>
-              <span className="break-all min-w-0 text-zinc-300">
-                {m.message}
-              </span>
+              {visibleMessages.length === 0 && (
+                <div className="text-zinc-600 text-[11px]">No messages yet…</div>
+              )}
+              {visibleMessages.map(m => (
+                <div key={m.id} className="flex items-start gap-1.5 text-[11px] leading-snug">
+                  <TwemojiFlag code={m.country_code} size={11} className="shrink-0 mt-px" />
+                  <span className="text-[#00FFAA] shrink-0 font-bold truncate max-w-[72px]">
+                    {m.nickname}:
+                  </span>
+                  <span className="break-all min-w-0 text-zinc-300">
+                    {m.message}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        {/* Input row */}
-        <div
-          className="flex items-center gap-1.5 px-2.5 py-1.5 shrink-0"
-          style={{ borderTop: '1px solid rgba(0,255,170,0.13)' }}
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            value={input}
-            onChange={e => setInput(e.target.value.slice(0, MAX_CHARS))}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                send()
-              }
-            }}
-            disabled={!player || (!!playerAllianceId && playerAllianceId !== selectedAllianceId)}
-            placeholder={
-              !player
-                ? 'Select a nation to join comms'
-                : playerAllianceId && playerAllianceId !== selectedAllianceId
-                  ? '[READ ONLY] Enemy comms...'
-                  : `Send to ${activeTab}...`
-            }
-            maxLength={MAX_CHARS}
-            className="flex-1 min-w-0 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-40"
-          />
-          <button
-            onClick={send}
-            disabled={!player || !input.trim() || sending || (!!playerAllianceId && playerAllianceId !== selectedAllianceId)}
-            className="text-[11px] tracking-wider disabled:opacity-30 hover:text-white transition-colors cursor-pointer shrink-0"
-            style={{ color: '#00FFAA' }}
-          >
-            SEND
-          </button>
-        </div>
+            {/* Input row */}
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1.5 shrink-0"
+              style={{ borderTop: '1px solid rgba(0,255,170,0.13)' }}
+            >
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={e => setInput(e.target.value.slice(0, MAX_CHARS))}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    send()
+                  }
+                }}
+                disabled={!player || (!!playerAllianceId && playerAllianceId !== selectedAllianceId)}
+                placeholder={
+                  !player
+                    ? 'Select a nation to join comms'
+                    : playerAllianceId && playerAllianceId !== selectedAllianceId
+                      ? '[READ ONLY] Enemy comms...'
+                      : `Send to ${activeTab}...`
+                }
+                maxLength={MAX_CHARS}
+                className="flex-1 min-w-0 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-40"
+              />
+              <button
+                onClick={send}
+                disabled={!player || !input.trim() || sending || (!!playerAllianceId && playerAllianceId !== selectedAllianceId)}
+                className="text-[11px] tracking-wider disabled:opacity-30 hover:text-white transition-colors cursor-pointer shrink-0"
+                style={{ color: '#00FFAA' }}
+              >
+                SEND
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </>
   )

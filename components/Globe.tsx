@@ -100,9 +100,10 @@ interface GlobeProps {
   onImpact?: (data: ImpactData) => void
   playerCountry?: string
   shieldActive?: boolean
+  warGlow?: { lat: number; lng: number; color: string } | null
 }
 
-const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, shieldActive }, ref) => {
+const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, shieldActive, warGlow }, ref) => {
   const mountRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -114,6 +115,54 @@ const Globe = forwardRef<GlobeHandle, GlobeProps>(({ onImpact, playerCountry, sh
   useEffect(() => { playerCountryRef.current = playerCountry }, [playerCountry])
   const shieldActiveRef = useRef(shieldActive ?? false)
   useEffect(() => { shieldActiveRef.current = shieldActive ?? false }, [shieldActive])
+  const warGlowMeshRef = useRef<THREE.Mesh | null>(null)
+
+  // War glow ring — pulsing ring over declared-war target country
+  useEffect(() => {
+    const scene = sceneRef.current
+    // Remove previous ring
+    if (warGlowMeshRef.current) {
+      scene?.remove(warGlowMeshRef.current)
+      warGlowMeshRef.current.geometry.dispose()
+      ;(warGlowMeshRef.current.material as THREE.Material).dispose()
+      warGlowMeshRef.current = null
+    }
+    if (!warGlow || !scene) return
+
+    const pos = latLngToVec3(warGlow.lat, warGlow.lng, RADIUS * 1.005)
+    const geo = new THREE.RingGeometry(0.04, 0.07, 32)
+    const mat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(warGlow.color),
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const ring = new THREE.Mesh(geo, mat)
+    ring.position.copy(pos)
+    ring.lookAt(new THREE.Vector3(0, 0, 0))
+    scene.add(ring)
+    warGlowMeshRef.current = ring
+
+    let running = true
+    const startTime = performance.now()
+    animsRef.current.push(() => {
+      if (!running) return false
+      const t = ((performance.now() - startTime) % 1500) / 1500
+      mat.opacity = Math.sin(t * Math.PI) * 0.85
+      return true
+    })
+
+    return () => {
+      running = false
+      if (warGlowMeshRef.current) {
+        scene.remove(warGlowMeshRef.current)
+        warGlowMeshRef.current.geometry.dispose()
+        ;(warGlowMeshRef.current.material as THREE.Material).dispose()
+        warGlowMeshRef.current = null
+      }
+    }
+  }, [warGlow])
 
   const missileInstancesRef = useRef<THREE.InstancedMesh | null>(null)
   const missileCoreInstancesRef = useRef<THREE.InstancedMesh | null>(null)

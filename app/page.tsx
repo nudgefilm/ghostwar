@@ -169,6 +169,7 @@ export default function Home() {
   const [topTarget, setTopTarget] = useState<{ code: string; hits: number } | null>(null)
   const [alliancesMeta, setAlliancesMeta] = useState<AllianceMeta[]>([])
   const [playerAllianceId, setPlayerAllianceId] = useState<string | null>(null)
+  const [allianceRanking, setAllianceRanking] = useState<{ nickname: string; country_code: string; missiles: number }[]>([])
   const [declaredWar, setDeclaredWar] = useState<WarDeclaration | null>(null)
   const [declaredWarKey, setDeclaredWarKey] = useState(0)
   const [allianceCode, setAllianceCode] = useState('')
@@ -241,6 +242,33 @@ export default function Home() {
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [])
+
+  // Alliance contributor ranking — top 5 members by missile count (24h)
+  useEffect(() => {
+    if (!playerAllianceId) { setAllianceRanking([]); return }
+    const supabase = createClient()
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    supabase
+      .from('players')
+      .select('id, nickname, country_code')
+      .eq('alliance_id', playerAllianceId)
+      .then(async ({ data: members }) => {
+        if (!members || members.length === 0) { setAllianceRanking([]); return }
+        const ids = members.map(m => m.id as string)
+        const { data: missiles } = await supabase
+          .from('missiles')
+          .select('launcher_id')
+          .in('launcher_id', ids)
+          .gte('launched_at', since)
+        const counts: Record<string, number> = {}
+        if (missiles) missiles.forEach(m => { const lid = m.launcher_id as string; counts[lid] = (counts[lid] ?? 0) + 1 })
+        const ranked = members
+          .map(m => ({ nickname: m.nickname as string, country_code: m.country_code as string, missiles: counts[m.id as string] ?? 0 }))
+          .sort((a, b) => b.missiles - a.missiles)
+          .slice(0, 5)
+        setAllianceRanking(ranked)
+      })
+  }, [playerAllianceId])
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -799,7 +827,14 @@ export default function Home() {
 
       {/* Globe — full screen */}
       <div className="fixed inset-0 z-0" style={{ width: '100vw', height: '100vh' }}>
-        <Globe ref={globeRef} playerCountry={player?.country_code} shieldActive={shieldActive} onImpact={(data: ImpactData) => {
+        <Globe ref={globeRef} playerCountry={player?.country_code} shieldActive={shieldActive} warGlow={(() => {
+          if (!declaredWar) return null
+          const coords = COUNTRY_COORDS[declaredWar.target_country]
+          if (!coords) return null
+          const warAlliance = alliancesMeta.find(a => a.id === declaredWar.alliance_id)
+          const color = warAlliance?.name === 'GHOST LEGION' ? '#FF2233' : '#00AAFF'
+          return { lat: coords[0], lng: coords[1], color }
+        })()} onImpact={(data: ImpactData) => {
           SoundEngine.init()
           setActiveCount(prev => Math.max(0, prev - 1))
 
@@ -1275,6 +1310,28 @@ export default function Home() {
               alliances={alliancesMeta}
               onJoined={(allianceId) => setPlayerAllianceId(allianceId)}
             />
+            {/* Alliance contributor ranking */}
+            {playerAllianceId && allianceRanking.length > 0 && (
+              <div className="mt-3 pt-2.5" style={{ borderTop: '1px solid rgba(0,255,170,0.12)' }}>
+                <div className="text-[9px] tracking-[0.2em] mb-1.5" style={{ color: 'rgba(0,255,170,0.5)' }}>
+                  TOP CONTRIBUTORS · 24H
+                </div>
+                <div className="flex flex-col gap-1">
+                  {allianceRanking.map((m, i) => {
+                    const allianceMeta = alliancesMeta.find(a => a.id === playerAllianceId)
+                    const color = allianceMeta?.name === 'GHOST LEGION' ? '#FF2233' : '#00AAFF'
+                    return (
+                      <div key={m.nickname} className="flex items-center gap-1.5 text-[10px]">
+                        <span style={{ color: 'rgba(255,255,255,0.3)', width: 12 }}>{i + 1}</span>
+                        <span className="text-zinc-300 truncate flex-1">{m.nickname}</span>
+                        <span className="font-bold tabular-nums" style={{ color }}>{m.missiles}</span>
+                        <span className="text-[9px]" style={{ color: 'rgba(255,255,255,0.3)' }}>🚀</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
