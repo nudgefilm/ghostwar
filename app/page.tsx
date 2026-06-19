@@ -15,7 +15,6 @@ import { COUNTRIES, COUNTRY_COORDS, COUNTRY_FLAGS, COUNTRY_NAMES } from '@/lib/c
 import { SoundEngine } from '@/lib/sounds'
 import EventTicker, { useEventTicker } from '@/components/EventTicker'
 import GlobalComms from '@/components/GlobalComms'
-import MobileView from '@/components/MobileView'
 import AllianceJoinCard from '@/app/components/alliance/AllianceJoinCard'
 import type { AllianceMeta } from '@/types/alliance'
 
@@ -138,13 +137,6 @@ export default function Home() {
   const impactSoundCountRef = useRef(0)
   const impactSoundResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 1024)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
 
   const [player, setPlayer] = useState<Player | null>(null)
   const [targetCountry, setTargetCountry] = useState<string | null>(null)
@@ -701,8 +693,6 @@ export default function Home() {
     (weaponType === 'missile' ? missiles : nukes) < quantity
 
   // ─────────────────────────────────────────────────────────────────────────
-  if (isMobile) return <MobileView />
-
   return (
     <div className="font-mono bg-[#0B0B0C]">
 
