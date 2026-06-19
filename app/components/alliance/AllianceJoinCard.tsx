@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import { AllianceMeta } from '@/types/alliance'
 
+const ALLIANCE_IMAGE: Record<string, string> = {
+  'GHOST LEGION': '/images/alliances/ghost-legion.jpeg',
+  'PHANTOM ORDER': '/images/alliances/phantom-order.jpeg',
+}
+
 interface Props {
   playerId: string
   currentAllianceId: string | null
@@ -47,16 +52,15 @@ export default function AllianceJoinCard({ playerId, currentAllianceId, alliance
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 font-mono">
         <div className="flex flex-col items-center gap-6">
-          <div
-            className="w-40 h-40 rounded-full border-4 flex items-center justify-center text-5xl font-black"
+          <img
+            src={ALLIANCE_IMAGE[selected.name] ?? ''}
+            alt={selected.name}
+            className="w-40 h-40 rounded-full object-cover"
             style={{
-              borderColor: selected.color,
+              border: `4px solid ${selected.color}`,
               boxShadow: `0 0 40px ${selected.color}, 0 0 80px ${selected.color}40`,
-              color: selected.color,
             }}
-          >
-            {selected.badge_label}
-          </div>
+          />
 
           <p className="text-2xl font-black tracking-widest text-white">
             YOU HAVE JOINED
@@ -107,12 +111,15 @@ export default function AllianceJoinCard({ playerId, currentAllianceId, alliance
                 boxShadow: isJoined ? `0 0 20px ${alliance.color}30` : 'none',
               }}
             >
-              <div
-                className="w-16 h-16 rounded-full border-2 flex items-center justify-center text-2xl font-black"
-                style={{ borderColor: alliance.color, color: alliance.color }}
-              >
-                {alliance.badge_label}
-              </div>
+              <img
+                src={ALLIANCE_IMAGE[alliance.name] ?? ''}
+                alt={alliance.name}
+                className="w-16 h-16 rounded-full object-cover"
+                style={{
+                  border: `2px solid ${alliance.color}`,
+                  boxShadow: `0 0 8px ${alliance.color}60`,
+                }}
+              />
               <span className="text-[10px] font-black tracking-[0.25em]" style={{ color: alliance.color }}>
                 {alliance.name}
               </span>
