@@ -195,26 +195,22 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
       className="fixed inset-0 z-[100] flex flex-col font-mono overflow-hidden"
       style={{ background: '#0B0B0C' }}
     >
-      {/* Animated scan band */}
-      <div className="pointer-events-none" style={{
+      {/* Neon red scan line */}
+      <div style={{
         position: 'fixed',
-        inset: 0,
-        zIndex: 1,
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          height: '25%',
-          background: 'linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.04) 40%, rgba(255,255,255,0.04) 60%, transparent 100%)',
-          animation: 'scanBand 5s linear infinite',
-        }} />
-      </div>
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: 'rgba(255, 34, 51, 0.4)',
+        boxShadow: '0 0 6px 2px rgba(255, 34, 51, 0.25), 0 0 16px 4px rgba(255, 34, 51, 0.1)',
+        pointerEvents: 'none',
+        zIndex: 50,
+        animation: 'neonScan 6s linear infinite',
+      }} />
       <style>{`
-        @keyframes scanBand {
-          0%   { top: -25%; }
-          100% { top: 100%; }
+        @keyframes neonScan {
+          0%   { top: -2px; }
+          100% { top: 100vh; }
         }
       `}</style>
       {/* Subtle noise vignette */}
