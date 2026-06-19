@@ -238,11 +238,14 @@ export default function Home() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Alliance contributor ranking — top 5 members by missile count (24h)
+  // Alliance contributor ranking — top 5 members by missile count since war declared_at
   useEffect(() => {
-    if (!playerAllianceId) { setAllianceRanking([]); return }
+    if (!playerAllianceId || !declaredWar || declaredWar.status !== 'declared' || !declaredWar.declared_at) {
+      setAllianceRanking([])
+      return
+    }
     const supabase = createClient()
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const since = declaredWar.declared_at
     supabase
       .from('players')
       .select('id, nickname, country_code')
@@ -263,7 +266,7 @@ export default function Home() {
           .slice(0, 5)
         setAllianceRanking(ranked)
       })
-  }, [playerAllianceId])
+  }, [playerAllianceId, declaredWar])
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -1278,7 +1281,7 @@ export default function Home() {
             {playerAllianceId && allianceRanking.length > 0 && (
               <div className="mt-3 pt-2.5" style={{ borderTop: '1px solid rgba(0,255,170,0.12)' }}>
                 <div className="text-[9px] tracking-[0.2em] mb-1.5" style={{ color: 'rgba(0,255,170,0.5)' }}>
-                  TOP CONTRIBUTORS · 24H
+                  TOP CONTRIBUTORS · WAR
                 </div>
                 <div className="flex flex-col gap-1">
                   {allianceRanking.map((m, i) => {
