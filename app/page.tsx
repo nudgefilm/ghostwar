@@ -1698,6 +1698,19 @@ export default function Home() {
               Get Bundle ($20) ▸
             </a>
           </div>
+          <div className="border-t border-zinc-700 mt-2 pt-2">
+            <div className="text-[10px] tracking-widest" style={{ color: '#00FFAA' }}>📡 FIELD CORRESPONDENT PROGRAM</div>
+            <div className="text-[10px] tracking-widest text-zinc-400 mt-0.5">Share your Ghost War experience → Earn missiles &amp; nukes</div>
+            <a
+              href="https://discord.gg/5QhFyQSPn4"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block mt-1 text-[10px] tracking-widest transition-opacity hover:opacity-80"
+              style={{ color: '#00FFAA' }}
+            >
+              [ VIEW REWARDS → ]
+            </a>
+          </div>
         </div>
 
       </aside>

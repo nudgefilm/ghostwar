@@ -1,16 +1,15 @@
 'use client'
 
-// Last updated: 2026-06-14
 const GAME_RULES: { icon: string; title: string; text: string }[] = [
-  { icon: '🚀', title: 'MISSILES',      text: '20 free daily (00:00 UTC / 09:00 KST)' },
-  { icon: '☢',  title: 'NUKES',         text: 'Earn 1 nuke per 1,000 missiles fired' },
-  { icon: '💥', title: 'DAMAGE',        text: 'Each hit accumulates. 10 weighted hits = +1% damage (nukes count as 50×)' },
-  { icon: '☠',  title: 'SCORCHED EARTH', text: "At 100% damage, that nation's attacks are reduced 50% until recovery" },
-  { icon: '🔄', title: 'RECOVERY',      text: 'Nations recover 10% damage daily at 00:00 UTC' },
-  { icon: '🏆', title: 'RANKINGS',      text: 'Climb the leaderboard by landing successful strikes' },
-  { icon: '🛡️', title: 'DEFENSE',       text: 'Click INTERCEPT rapidly when under attack to build up interception chance. Nukes can only be intercepted by nukes.' },
-  { icon: '🤝', title: 'ALLIANCES',     text: 'Mutual requests build alliance strength (5% damage reduction each, max 50%). Attacking an ally breaks it.' },
-  { icon: '🏛',  title: 'HALL OF FAME', text: 'Nuclear strikes & interceptions are recorded for 30 days.' },
+  { icon: '🚀', title: 'MISSILES',      text: '20 free daily (reset 00:00 UTC / 09:00 KST)' },
+  { icon: '☢️', title: 'NUKES',         text: 'Earn 1 nuke per 1,000 missiles fired, or purchase via ARSENAL SUPPLY.' },
+  { icon: '💥', title: 'DAMAGE',        text: 'Every 10 missile hits = +1% damage. 1 nuke hit = +10% damage instantly.' },
+  { icon: '🛡️', title: 'DEFENSE',       text: 'Nations auto-recover +5% defense per hour. Below 10% defense, the nation cannot be targeted or launch attacks.' },
+  { icon: '☠️', title: 'SCORCHED EARTH', text: "At 100% damage, that nation's attack power is reduced by 50%." },
+  { icon: '🔄', title: 'RECOVERY',      text: 'Nations recover -5% damage per hour automatically.' },
+  { icon: '🏆', title: 'RANKINGS',      text: 'Climb the leaderboard by landing successful strikes.' },
+  { icon: '⚔️', title: 'ALLIANCES',     text: 'Join GHOST LEGION or PHANTOM ORDER. Declare war, vote, and coordinate mass strikes against target nations.' },
+  { icon: '🏛️', title: 'HALL OF FAME', text: 'Nuclear strikes are recorded for 30 days.' },
 ]
 
 interface Props {
