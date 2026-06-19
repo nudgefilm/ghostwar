@@ -50,7 +50,7 @@ export default function AllianceJoinCard({ playerId, currentAllianceId, alliance
 
   if (showConfirm && selected) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 font-mono">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 font-mono">
         <div className="flex flex-col items-center gap-6">
           <img
             src={ALLIANCE_IMAGE[selected.name] ?? ''}
