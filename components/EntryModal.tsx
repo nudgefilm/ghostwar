@@ -240,13 +240,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           {/* ── Title ──────────────────────────────────────────────────────── */}
           <div className="text-center mb-1">
             <h1
-              className="text-3xl font-bold tracking-[0.18em] mb-1"
+              className="text-5xl font-bold tracking-[0.18em] mb-1"
               style={{
                 color: '#FF2233',
                 textShadow: '0 0 8px #FF2233, 0 0 20px #FF223399, 0 0 40px #FF223355',
               }}
             >
-              GLOBAL GHOST WAR
+              GHOST WAR
             </h1>
             <div className="space-y-1 text-[11px] tracking-[0.2em]">
               <p style={{ color: '#FF2233', textShadow: '0 0 6px #FF223388' }}>
