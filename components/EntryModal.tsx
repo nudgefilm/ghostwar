@@ -201,8 +201,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
         left: 0,
         right: 0,
         height: '1px',
-        background: 'rgba(255, 34, 51, 0.28)',
-        boxShadow: '0 0 4px 1px rgba(255, 34, 51, 0.16), 0 0 10px 2px rgba(255, 34, 51, 0.09)',
+        background: 'rgba(255, 34, 51, 0.5)',
         pointerEvents: 'none',
         zIndex: 3,
         animation: 'neonScan 7s linear infinite',
@@ -263,7 +262,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           </div>
 
           {/* ── Alliance badges ─────────────────────────────────────────────── */}
-          <div className="flex items-center justify-center gap-5 mb-2">
+          <div className="flex items-center justify-center gap-5 mb-6">
             <div className="flex flex-col items-center gap-1.5">
               <div className="w-[170px] h-[170px] border border-[#FF2233]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #FF223344' }}>
