@@ -29,17 +29,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 403 })
   }
 
-  // Insert message (cleanup of messages >24h is piggy-backed here)
+  const { error: insertError } = await supabase.from('chat_messages').insert({
+    nickname: player.nickname,
+    country_code: player.country_code,
+    message: msg,
+    ...(alliance_id ? { alliance_id: String(alliance_id) } : {}),
+  })
+
+  if (insertError) {
+    console.error('[chat/send] insert error', insertError)
+    return NextResponse.json({ error: insertError.message }, { status: 500 })
+  }
+
+  // Cleanup >24h messages — fire and forget, don't block response
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  await Promise.all([
-    supabase.from('chat_messages').insert({
-      nickname: player.nickname,
-      country_code: player.country_code,
-      message: msg,
-      ...(alliance_id ? { alliance_id: String(alliance_id) } : {}),
-    }),
-    supabase.from('chat_messages').delete().lt('created_at', cutoff),
-  ])
+  supabase.from('chat_messages').delete().lt('created_at', cutoff).then()
 
   return NextResponse.json({ success: true })
 }

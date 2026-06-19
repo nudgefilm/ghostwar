@@ -148,7 +148,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
     setSending(true)
 
     try {
-      await fetch('/api/chat/send', {
+      const res = await fetch('/api/chat/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,6 +159,10 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
           alliance_id: selectedAllianceId,
         }),
       })
+      if (!res.ok) {
+        const data = await res.json() as { error?: string }
+        console.error('[GlobalComms] send failed', data.error)
+      }
     } finally {
       setSending(false)
     }
