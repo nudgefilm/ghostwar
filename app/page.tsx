@@ -16,6 +16,8 @@ import { SoundEngine } from '@/lib/sounds'
 import EventTicker, { useEventTicker } from '@/components/EventTicker'
 import GlobalComms from '@/components/GlobalComms'
 import MobileView from '@/components/MobileView'
+import AllianceJoinCard from '@/app/components/alliance/AllianceJoinCard'
+import type { AllianceMeta } from '@/types/alliance'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const Globe = dynamic(() => import('@/components/Globe'), { ssr: false }) as any
@@ -176,6 +178,8 @@ export default function Home() {
   const [alliances, setAlliances] = useState<{ country_a: string; country_b: string; request_count: number; status: string }[]>([])
   const [showAllianceDropdown, setShowAllianceDropdown] = useState(false)
   const [allianceTarget, setAllianceTarget] = useState('')
+  const [alliancesMeta, setAlliancesMeta] = useState<AllianceMeta[]>([])
+  const [playerAllianceId, setPlayerAllianceId] = useState<string | null>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { queue: tickerQueue, pushEvent, shift: shiftTicker } = useEventTicker()
@@ -193,6 +197,27 @@ export default function Home() {
   // Stable ref for player (used in pagehide/beforeunload closure)
   const defenseStateRef = useRef({ player: null as Player | null })
   defenseStateRef.current = { player }
+
+  // ── Alliance meta fetch (mount) ───────────────────────────────────────────
+  useEffect(() => {
+    createClient()
+      .from('alliances_meta')
+      .select('id, name, color, badge_label, member_count')
+      .then(({ data }) => { if (data) setAlliancesMeta(data as AllianceMeta[]) })
+  }, [])
+
+  // ── Player alliance_id fetch (on player change) ───────────────────────────
+  useEffect(() => {
+    if (!player) { setPlayerAllianceId(null); return }
+    createClient()
+      .from('players')
+      .select('alliance_id')
+      .eq('id', player.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        setPlayerAllianceId((data as { alliance_id: string | null } | null)?.alliance_id ?? null)
+      })
+  }, [player])
 
   // ── Initial data load ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -1322,97 +1347,12 @@ export default function Home() {
         {player && (
           <div className="pointer-events-auto p-3" style={{ ...CARD, borderColor: 'rgba(0,255,170,0.22)' }}>
             <div className="text-zinc-300 text-[10px] tracking-widest mb-2">ALLIANCES</div>
-
-            {/* Pending incoming requests */}
-            {pendingIncoming.map(a => {
-              const other = a.country_a === player.country_code ? a.country_b : a.country_a
-              return (
-                <div key={`${a.country_a}-${a.country_b}`} className="mb-2 p-1.5 border border-[#00FFAA]/25 bg-[#00FFAA]/5">
-                  <div className="text-[#00FFAA] text-[10px] mb-1">
-                    🤝 {COUNTRY_FLAGS[other] ?? ''} {COUNTRY_NAMES[other] ?? other} requests alliance
-                  </div>
-                  <button
-                    onClick={() => handleAllianceAccept(a.country_a, a.country_b)}
-                    className="text-[10px] tracking-widest border border-[#00FFAA]/50 hover:border-[#00FFAA] px-2 py-0.5 text-[#00FFAA] hover:bg-[#00FFAA]/10 transition-colors cursor-pointer"
-                  >
-                    [ ACCEPT ]
-                  </button>
-                </div>
-              )
-            })}
-
-            {/* Active alliances with strength bar */}
-            {activeAlliances.length > 0 && (
-              <div className="space-y-1.5 mb-2">
-                {activeAlliances.map(a => {
-                  const other = a.country_a === player.country_code ? a.country_b : a.country_a
-                  const strength = Math.min(50, a.request_count * 5)
-                  const filled = Math.round(strength / 10)
-                  return (
-                    <div key={`${a.country_a}-${a.country_b}`} className="flex items-center gap-1.5">
-                      <TwemojiFlag code={other} size={12} className="shrink-0" />
-                      <span className="text-zinc-200 text-[10px] w-14 truncate shrink-0">{COUNTRY_NAMES[other] ?? other}</span>
-                      <span className="text-[#00FFAA] text-[10px] font-mono">
-                        {'█'.repeat(filled)}{'░'.repeat(5 - filled)}
-                      </span>
-                      <span className="text-[#00FFAA] text-[9px] ml-0.5">{strength}%</span>
-                      <button
-                        onClick={() => handleAllianceBreak(a.country_a, a.country_b)}
-                        className="ml-auto text-zinc-500 text-[9px] hover:text-[#FF2233] transition-colors cursor-pointer shrink-0"
-                      >
-                        [BREAK]
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {activeAlliances.length === 0 && pendingIncoming.length === 0 && (
-              <div className="text-zinc-300 text-[10px] mb-2">No active alliances</div>
-            )}
-
-            {/* Request a new alliance */}
-            {!showAllianceDropdown ? (
-              <button
-                onClick={() => setShowAllianceDropdown(true)}
-                className="w-full py-1.5 text-[10px] tracking-widest border border-[#00FFAA]/25 hover:border-[#00FFAA]/50 text-[#00FFAA] hover:bg-[#00FFAA]/5 transition-colors cursor-pointer"
-              >
-                [ REQUEST ALLIANCE ]
-              </button>
-            ) : (
-              <div>
-                <select
-                  value={allianceTarget}
-                  onChange={e => setAllianceTarget(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] px-2 py-1 mb-1"
-                >
-                  <option value="">— SELECT NATION —</option>
-                  {COUNTRIES.filter(c => c.code !== player.country_code).map(c => (
-                    <option key={c.code} value={c.code}>{COUNTRY_FLAGS[c.code] ?? ''} {c.name}</option>
-                  ))}
-                </select>
-                <div className="flex gap-1">
-                  <button
-                    onClick={async () => {
-                      if (!allianceTarget) return
-                      await handleAllianceRequest(allianceTarget)
-                      setAllianceTarget('')
-                      setShowAllianceDropdown(false)
-                    }}
-                    className="flex-1 py-1 text-[10px] tracking-widest border border-[#00FFAA]/50 text-[#00FFAA] hover:bg-[#00FFAA]/10 transition-colors cursor-pointer"
-                  >
-                    SEND
-                  </button>
-                  <button
-                    onClick={() => { setShowAllianceDropdown(false); setAllianceTarget('') }}
-                    className="px-2 py-1 text-[10px] border border-zinc-700 text-zinc-300 hover:text-zinc-200 transition-colors cursor-pointer"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            )}
+            <AllianceJoinCard
+              playerId={player.id}
+              currentAllianceId={playerAllianceId}
+              alliances={alliancesMeta}
+              onJoined={(allianceId) => setPlayerAllianceId(allianceId)}
+            />
           </div>
         )}
 
