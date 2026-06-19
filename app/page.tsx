@@ -218,11 +218,21 @@ export default function Home() {
       .from('war_declarations')
       .select('*')
       .eq('status', 'declared')
+      .gt('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
       .then(({ data }) => { setDeclaredWar(data as WarDeclaration | null) })
   }, [declaredWarKey])
+
+  // Client-side expiry: clear declaredWar when expires_at passes (cron may not have run yet)
+  useEffect(() => {
+    if (!declaredWar?.expires_at) return
+    const ms = new Date(declaredWar.expires_at).getTime() - Date.now()
+    if (ms <= 0) { setDeclaredWar(null); return }
+    const t = setTimeout(() => setDeclaredWar(null), ms)
+    return () => clearTimeout(t)
+  }, [declaredWar])
 
   useEffect(() => {
     const supabase = createClient()
