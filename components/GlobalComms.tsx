@@ -243,6 +243,25 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
           </button>
         </div>
 
+        {/* Collapsed preview — latest message 1 line */}
+        {!expanded && (
+          <div className="px-2.5 py-1.5 text-[11px] flex gap-1 min-w-0 overflow-hidden">
+            {(() => {
+              const latest = visibleMessages[visibleMessages.length - 1]
+              if (!latest) return <span className="text-zinc-600 truncate">No messages yet…</span>
+              const tabColor = ALLIANCE_TABS.find(t => allianceIds[t.name] === latest.alliance_id)?.color
+                ?? ALLIANCE_TABS.find(t => t.name === activeTab)?.color
+                ?? '#00FFAA'
+              return (
+                <>
+                  <span className="font-bold shrink-0" style={{ color: tabColor }}>{latest.nickname}:</span>
+                  <span className="text-zinc-300 truncate">{latest.message}</span>
+                </>
+              )
+            })()}
+          </div>
+        )}
+
         {/* Expanded content — hidden when collapsed */}
         {expanded && (
           <>
