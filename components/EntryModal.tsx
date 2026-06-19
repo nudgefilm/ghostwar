@@ -240,7 +240,7 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
 
       {/* ── Main content (vertically centered) ─────────────────────────────── */}
       <div className="relative z-10 flex-1 flex items-center justify-center px-4 py-0">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-sm py-10">
 
           {/* ── Title ──────────────────────────────────────────────────────── */}
           <div className="text-center mb-1">
@@ -269,13 +269,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
           {/* ── Alliance badges ─────────────────────────────────────────────── */}
           <div className="flex items-center justify-center gap-5 mb-2">
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-[140px] h-[140px] border border-[#FF2233]/40 overflow-hidden"
+              <div className="w-[170px] h-[170px] border border-[#FF2233]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #FF223344' }}>
                 <Image
                   src="/GHOST_LEGION.jpeg"
                   alt="GHOST LEGION"
-                  width={140}
-                  height={140}
+                  width={170}
+                  height={170}
                   className="w-full h-full object-cover"
                   unoptimized
                 />
@@ -296,13 +296,13 @@ export default function EntryModal({ onEnter }: EntryModalProps) {
             </div>
 
             <div className="flex flex-col items-center gap-1.5">
-              <div className="w-[140px] h-[140px] border border-[#0088FF]/40 overflow-hidden"
+              <div className="w-[170px] h-[170px] border border-[#0088FF]/40 overflow-hidden"
                 style={{ boxShadow: '0 0 10px #0088FF44' }}>
                 <Image
                   src="/PHANTOM_ORDER.jpeg"
                   alt="PHANTOM ORDER"
-                  width={140}
-                  height={140}
+                  width={170}
+                  height={170}
                   className="w-full h-full object-cover"
                   unoptimized
                 />
