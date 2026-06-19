@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/daily-brief",
       "schedule": "50 23 * * *"
+    },
+    {
+      "path": "/api/cron/war-resolve",
+      "schedule": "* * * * *"
     }
   ]
 }

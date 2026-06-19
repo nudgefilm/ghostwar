@@ -11,7 +11,15 @@ interface ChatMessage {
   country_code: string
   message: string
   created_at: string
+  alliance_id?: string | null
 }
+
+type TabName = 'GHOST LEGION' | 'PHANTOM ORDER'
+
+const ALLIANCE_TABS: { name: TabName; color: string }[] = [
+  { name: 'GHOST LEGION', color: '#FF2233' },
+  { name: 'PHANTOM ORDER', color: '#00AAFF' },
+]
 
 const MAX_MESSAGES = 20
 const MAX_CHARS = 100
@@ -20,17 +28,40 @@ const EXPANDED_ROWS = 10
 
 interface Props {
   player: Player | null
+  playerAllianceId?: string | null
 }
 
-export default function GlobalComms({ player }: Props) {
+export default function GlobalComms({ player, playerAllianceId }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [activeTab, setActiveTab] = useState<TabName>('GHOST LEGION')
+  const [allianceIds, setAllianceIds] = useState<Record<string, string>>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   // Tracks outgoing messages to dedup when Realtime echoes them back
   const pendingRef = useRef<Set<string>>(new Set())
+
+  // Fetch alliance IDs for tab filtering
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('alliances_meta').select('id, name').then(({ data }) => {
+      if (!data) return
+      const map: Record<string, string> = {}
+      data.forEach((a: { id: string; name: string }) => { map[a.name] = a.id })
+      setAllianceIds(map)
+    })
+  }, [])
+
+  // Set initial tab to player's alliance once IDs are loaded
+  useEffect(() => {
+    if (!playerAllianceId || Object.keys(allianceIds).length === 0) return
+    const entry = Object.entries(allianceIds).find(([, id]) => id === playerAllianceId)
+    if (entry && (entry[0] === 'GHOST LEGION' || entry[0] === 'PHANTOM ORDER')) {
+      setActiveTab(entry[0] as TabName)
+    }
+  }, [playerAllianceId, allianceIds])
 
   // Initial fetch — last 24h messages, capped at MAX_MESSAGES
   useEffect(() => {
@@ -38,7 +69,7 @@ export default function GlobalComms({ player }: Props) {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     supabase
       .from('chat_messages')
-      .select('id, nickname, country_code, message, created_at')
+      .select('id, nickname, country_code, message, created_at, alliance_id')
       .gte('created_at', cutoff)
       .order('created_at', { ascending: true })
       .limit(MAX_MESSAGES)
@@ -122,8 +153,14 @@ export default function GlobalComms({ player }: Props) {
     }
   }
 
+  // Filter by active alliance tab, show alliance-less messages in both tabs
+  const selectedAllianceId = allianceIds[activeTab]
+  const filteredMessages = selectedAllianceId
+    ? messages.filter(m => !m.alliance_id || m.alliance_id === selectedAllianceId)
+    : messages
+
   // Visible messages: last N rows depending on expanded state
-  const visibleMessages = messages.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
+  const visibleMessages = filteredMessages.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
 
   // Per-row budget for max-height cap: text-[11px] leading-snug ≈ 14px + space-y-1.5 gap 6px
   const ROW_H = 22
@@ -139,6 +176,26 @@ export default function GlobalComms({ player }: Props) {
         border: '1px solid rgba(0,255,170,0.35)',
       }}
     >
+      {/* Alliance tabs */}
+      <div className="flex shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        {ALLIANCE_TABS.map(tab => {
+          const isActive = activeTab === tab.name
+          return (
+            <button
+              key={tab.name}
+              onClick={() => setActiveTab(tab.name)}
+              className="flex-1 py-1 text-[10px] font-bold tracking-widest transition-colors cursor-pointer"
+              style={{
+                color: isActive ? tab.color : '#71717a',
+                borderBottom: isActive ? `2px solid ${tab.color}` : '2px solid transparent',
+              }}
+            >
+              {tab.name}
+            </button>
+          )
+        })}
+      </div>
+
       {/* Header */}
       <div
         className="flex items-center justify-between px-3 py-1.5 shrink-0"
@@ -206,14 +263,20 @@ export default function GlobalComms({ player }: Props) {
               send()
             }
           }}
-          disabled={!player}
-          placeholder={player ? 'Send a message…' : 'Select a nation to join comms'}
+          disabled={!player || (!!playerAllianceId && playerAllianceId !== selectedAllianceId)}
+          placeholder={
+            !player
+              ? 'Select a nation to join comms'
+              : playerAllianceId && playerAllianceId !== selectedAllianceId
+                ? '[READ ONLY] Enemy comms...'
+                : `Send to ${activeTab}...`
+          }
           maxLength={MAX_CHARS}
           className="flex-1 min-w-0 bg-transparent text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none disabled:opacity-40"
         />
         <button
           onClick={send}
-          disabled={!player || !input.trim() || sending}
+          disabled={!player || !input.trim() || sending || (!!playerAllianceId && playerAllianceId !== selectedAllianceId)}
           className="text-[11px] tracking-wider disabled:opacity-30 hover:text-white transition-colors cursor-pointer shrink-0"
           style={{ color: '#00FFAA' }}
         >
