@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   try { body = await req.json() }
   catch { return NextResponse.json({ error: 'INVALID_JSON' }, { status: 400 }) }
 
-  const { player_id, nickname, country_code, message } = body
+  const { player_id, nickname, country_code, message, alliance_id } = body
 
   if (!player_id || !nickname || !country_code || !message) {
     return NextResponse.json({ error: 'MISSING_FIELDS' }, { status: 400 })
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       nickname: player.nickname,
       country_code: player.country_code,
       message: msg,
+      ...(alliance_id ? { alliance_id: String(alliance_id) } : {}),
     }),
     supabase.from('chat_messages').delete().lt('created_at', cutoff),
   ])

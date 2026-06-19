@@ -21,7 +21,7 @@ const ALLIANCE_TABS: { name: TabName; color: string }[] = [
   { name: 'PHANTOM ORDER', color: '#00AAFF' },
 ]
 
-const MAX_MESSAGES = 20
+const MAX_MESSAGES = 50
 const MAX_CHARS = 100
 const COLLAPSED_ROWS = 1
 const EXPANDED_ROWS = 10
@@ -63,29 +63,38 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
     }
   }, [playerAllianceId, allianceIds])
 
-  // Initial fetch — last 24h messages, capped at MAX_MESSAGES
+  const selectedAllianceId = allianceIds[activeTab]
+
+  // Load 50 most recent messages for the active alliance tab
   useEffect(() => {
+    if (!selectedAllianceId) return
     const supabase = createClient()
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    setMessages([])
     supabase
       .from('chat_messages')
       .select('id, nickname, country_code, message, created_at, alliance_id')
-      .gte('created_at', cutoff)
+      .eq('alliance_id', selectedAllianceId)
       .order('created_at', { ascending: true })
       .limit(MAX_MESSAGES)
       .then(({ data }) => {
         if (data) setMessages(data as ChatMessage[])
       })
-  }, [])
+  }, [selectedAllianceId])
 
-  // Realtime subscription — dedup own optimistic messages
+  // Realtime subscription — scoped to active alliance tab
   useEffect(() => {
+    if (!selectedAllianceId) return
     const supabase = createClient()
     const channel = supabase
-      .channel('global-comms')
+      .channel(`global-comms-${selectedAllianceId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `alliance_id=eq.${selectedAllianceId}`,
+        },
         (payload) => {
           const incoming = payload.new as ChatMessage
           const key = `${incoming.nickname}:${incoming.message}`
@@ -109,7 +118,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [selectedAllianceId])
 
   // Scroll to bottom when expanded or new message arrives
   useEffect(() => {
@@ -119,7 +128,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
   }, [messages, expanded])
 
   const send = async () => {
-    if (!player || !input.trim() || sending) return
+    if (!player || !input.trim() || sending || !selectedAllianceId) return
     const msg = input.trim()
     const key = `${player.nickname}:${msg}`
 
@@ -131,10 +140,11 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
       country_code: player.country_code,
       message: msg,
       created_at: new Date().toISOString(),
+      alliance_id: selectedAllianceId,
     }].slice(-MAX_MESSAGES))
 
     setInput('')
-    inputRef.current?.focus()  // synchronous — input not disabled during send
+    inputRef.current?.focus()
     setSending(true)
 
     try {
@@ -146,6 +156,7 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
           nickname: player.nickname,
           country_code: player.country_code,
           message: msg,
+          alliance_id: selectedAllianceId,
         }),
       })
     } finally {
@@ -153,14 +164,8 @@ export default function GlobalComms({ player, playerAllianceId }: Props) {
     }
   }
 
-  // Filter by active alliance tab, show alliance-less messages in both tabs
-  const selectedAllianceId = allianceIds[activeTab]
-  const filteredMessages = selectedAllianceId
-    ? messages.filter(m => !m.alliance_id || m.alliance_id === selectedAllianceId)
-    : messages
-
   // Visible messages: last N rows depending on expanded state
-  const visibleMessages = filteredMessages.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
+  const visibleMessages = messages.slice(expanded ? -EXPANDED_ROWS : -COLLAPSED_ROWS)
 
   // Per-row budget for max-height cap: text-[11px] leading-snug ≈ 14px + space-y-1.5 gap 6px
   const ROW_H = 22
