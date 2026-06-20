@@ -422,7 +422,9 @@ export default function Home() {
         })
       }
 
-      if (missile.launcher_country !== player?.country_code) {
+      // Skip only missiles the current player personally fired (already shown at launch time).
+      // launcher_country check was wrong: same-country players and auto-strike would be invisible.
+      if (missile.launcher_id !== player?.id) {
         if (!launchedMissileIdsRef.current.has(missile.id)) {
           launchedMissileIdsRef.current.add(missile.id)
           const fromCoords = COUNTRY_COORDS[missile.launcher_country]
