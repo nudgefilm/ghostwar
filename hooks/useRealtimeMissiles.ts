@@ -74,7 +74,7 @@ export function useRealtimeMissiles({
       const now = new Date().toISOString()
       lastPollTimeRef.current = now  // advance immediately so concurrent polls never share the same window
 
-      const [{ data: newMissiles }, { data: newNews }] = await Promise.all([
+      const [{ data: newMissiles, error: missileError }, { data: newNews }] = await Promise.all([
         supabase
           .from('missiles')
           .select('*')
@@ -86,6 +86,11 @@ export function useRealtimeMissiles({
           .gt('created_at', since)
           .order('created_at', { ascending: true }),
       ])
+
+      if (missileError) console.error('[poll] missiles error:', missileError)
+      if (newMissiles && newMissiles.length > 0) {
+        console.log('[poll] missiles found:', newMissiles.length, newMissiles.map((m: Record<string, unknown>) => `${String(m.launcher_country)}->${String(m.target_country)}`))
+      }
 
       newMissiles?.forEach(m => callbacksRef.current.onMissile(m as MissileRow))
       newNews?.forEach(n => callbacksRef.current.onNews(n as NewsFeedRow))

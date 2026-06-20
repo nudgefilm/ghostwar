@@ -397,6 +397,7 @@ export default function Home() {
   // ── Realtime callbacks ────────────────────────────────────────────────────
   const onMissile = useCallback(
     (missile: import('@/hooks/useRealtimeMissiles').MissileRow) => {
+      console.log('[MISSILE EVENT]', missile.id?.slice(0, 8), missile.launcher_country, '->', missile.target_country, '| launched_at:', missile.launched_at, '| inRef:', launchedMissileIdsRef.current.has(missile.id))
       if (missile.target_country === player?.country_code && missile.launcher_country !== player?.country_code) {
         SoundEngine.init()
         SoundEngine.playAlert()
@@ -428,6 +429,7 @@ export default function Home() {
         launchedMissileIdsRef.current.add(missile.id)
         const fromCoords = COUNTRY_COORDS[missile.launcher_country]
         const toCoords = COUNTRY_COORDS[missile.target_country]
+        console.log('[MISSILE RENDER]', missile.id?.slice(0, 8), '| fromCoords:', fromCoords, '| toCoords:', toCoords)
         if (fromCoords && toCoords) {
           const remainingMs = Math.max(
             1000,
