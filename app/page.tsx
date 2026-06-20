@@ -398,8 +398,8 @@ export default function Home() {
   const onMissile = useCallback(
     (missile: import('@/hooks/useRealtimeMissiles').MissileRow) => {
       console.log('[MISSILE EVENT]', missile.id?.slice(0, 8), missile.launcher_country, '->', missile.target_country, '| launched_at:', missile.launched_at, '| inRef:', launchedMissileIdsRef.current.has(missile.id))
+      SoundEngine.init()
       if (missile.target_country === player?.country_code && missile.launcher_country !== player?.country_code) {
-        SoundEngine.init()
         SoundEngine.playAlert()
         setInterceptAlert(`⚠ INCOMING: ${missile.launcher_country} → ${missile.target_country}`)
         const homeCoords = COUNTRY_COORDS[player.country_code]

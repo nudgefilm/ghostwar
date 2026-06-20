@@ -93,13 +93,19 @@ export const SoundEngine = {
     rumble.start(t); rumble.stop(t + 2.0)
   },
 
-  playImpact(volume = 1.0) {
+  async playImpact(volume = 1.0) {
     const ctx = this.ctx
     if (!ctx) return
     // Slight pitch variation (±12%) prevents identical simultaneous sounds from
     // cancelling each other out when a multi-missile salvo lands at the same time.
     const rate = 0.88 + Math.random() * 0.24
     if (this._buffers['impact']) {
+      this._playBuffer('impact', volume, rate)
+      return
+    }
+    // Buffer not cached yet — wait for it (handles race between init() and impact)
+    const buf = await this._loadBuffer('impact')
+    if (buf) {
       this._playBuffer('impact', volume, rate)
       return
     }
