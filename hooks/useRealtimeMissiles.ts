@@ -47,7 +47,12 @@ export function useRealtimeMissiles({
   onCountryUpdate,
 }: UseRealtimeMissilesParams) {
   const callbacksRef = useRef({ onMissile, onNews, onCountryUpdate })
-  const lastPollTimeRef = useRef<string>(new Date().toISOString())
+  // missiles: ID-based dedup — immune to server/client clock skew
+  const seenMissileIdsRef = useRef<Set<string>>(new Set())
+  // Lower bound: 10 min before mount, covers any clock skew and avoids full table scan
+  const missilesWindowRef = useRef<string>(new Date(Date.now() - 10 * 60 * 1000).toISOString())
+  // news_feed: keeps timestamp-based (works, DB-generated created_at is always consistent)
+  const lastNewsPollRef = useRef<string>(new Date().toISOString())
   const countryTickRef = useRef(0)
 
   useEffect(() => {
@@ -55,7 +60,7 @@ export function useRealtimeMissiles({
   }, [onMissile, onNews, onCountryUpdate])
 
   useEffect(() => {
-    console.log('[useRealtimeMissiles] mounted — build 85681b2')
+    console.log('[useRealtimeMissiles] mounted — ID-based missile dedup')
     const supabase = createClient()
 
     // Realtime: countries UPDATE (online_users, damage_percent 등 즉시 반영)
@@ -73,33 +78,41 @@ export function useRealtimeMissiles({
     let tickCount = 0
     const poll = async () => {
       tickCount++
-      const since = lastPollTimeRef.current
-      const now = new Date().toISOString()
-      lastPollTimeRef.current = now  // advance immediately so concurrent polls never share the same window
+
+      // missiles: fixed lower bound (no sliding window) + ID dedup
+      // — immune to clock skew between cron server and client
+      const newsSince = lastNewsPollRef.current
+      const newsNow = new Date().toISOString()
+      lastNewsPollRef.current = newsNow
 
       const [{ data: newMissiles, error: missileError }, { data: newNews }] = await Promise.all([
         supabase
           .from('missiles')
           .select('*')
-          .gt('launched_at', since)
+          .gte('launched_at', missilesWindowRef.current)   // fixed lower bound, gte not gt
           .order('launched_at', { ascending: true }),
         supabase
           .from('news_feed')
           .select('*')
-          .gt('created_at', since)
+          .gt('created_at', newsSince)
           .order('created_at', { ascending: true }),
       ])
 
-      // Periodic tick log (every 10s) — confirms polling is alive regardless of results
       if (tickCount % 10 === 0) {
-        console.log(`[poll] tick #${tickCount} | missiles: ${newMissiles?.length ?? 'err'} | news: ${newNews?.length ?? 'err'} | since: ${since.slice(11, 19)}`)
+        console.log(`[poll] tick #${tickCount} | missiles query: ${newMissiles?.length ?? 'err'} rows | seen: ${seenMissileIdsRef.current.size}`)
       }
       if (missileError) console.error('[poll] missiles error:', missileError)
-      if (newMissiles && newMissiles.length > 0) {
-        console.log('[poll] missiles found:', newMissiles.length, newMissiles.map((m: Record<string, unknown>) => `${String(m.launcher_country)}->${String(m.target_country)}`))
-      }
 
-      newMissiles?.forEach(m => callbacksRef.current.onMissile(m as MissileRow))
+      // ID-based dedup: only process missiles not yet seen this session
+      newMissiles?.forEach(m => {
+        const id = m.id as string
+        if (!seenMissileIdsRef.current.has(id)) {
+          seenMissileIdsRef.current.add(id)
+          console.log('[poll] new missile:', id.slice(0, 8), (m as Record<string, unknown>).launcher_country, '->', (m as Record<string, unknown>).target_country)
+          callbacksRef.current.onMissile(m as MissileRow)
+        }
+      })
+
       newNews?.forEach(n => callbacksRef.current.onNews(n as NewsFeedRow))
 
       countryTickRef.current += 1
