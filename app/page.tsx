@@ -422,30 +422,28 @@ export default function Home() {
         })
       }
 
-      // Skip only missiles the current player personally fired (already shown at launch time).
-      // launcher_country check was wrong: same-country players and auto-strike would be invisible.
-      if (missile.launcher_id !== player?.id) {
-        if (!launchedMissileIdsRef.current.has(missile.id)) {
-          launchedMissileIdsRef.current.add(missile.id)
-          const fromCoords = COUNTRY_COORDS[missile.launcher_country]
-          const toCoords = COUNTRY_COORDS[missile.target_country]
-          if (fromCoords && toCoords) {
-            const remainingMs = Math.max(
-              1000,
-              new Date(missile.arrives_at).getTime() - Date.now(),
-            )
-            globeRef.current?.launchMissile(
-              fromCoords[0], fromCoords[1],
-              toCoords[0], toCoords[1],
-              missile.quantity,
-              missile.type as 'missile' | 'nuke',
-              remainingMs,
-              missile.id,
-              missile.target_country,
-              missile.launcher_country,
-            )
-            setActiveCount(prev => prev + missile.quantity)
-          }
+      // Self-launched missiles are pre-registered in launchedMissileIdsRef at launch time,
+      // so the poll dedupes them. All other missiles (other players + auto-strike) are shown.
+      if (!launchedMissileIdsRef.current.has(missile.id)) {
+        launchedMissileIdsRef.current.add(missile.id)
+        const fromCoords = COUNTRY_COORDS[missile.launcher_country]
+        const toCoords = COUNTRY_COORDS[missile.target_country]
+        if (fromCoords && toCoords) {
+          const remainingMs = Math.max(
+            1000,
+            new Date(missile.arrives_at).getTime() - Date.now(),
+          )
+          globeRef.current?.launchMissile(
+            fromCoords[0], fromCoords[1],
+            toCoords[0], toCoords[1],
+            missile.quantity,
+            missile.type as 'missile' | 'nuke',
+            remainingMs,
+            missile.id,
+            missile.target_country,
+            missile.launcher_country,
+          )
+          setActiveCount(prev => prev + missile.quantity)
         }
       }
     },
@@ -795,6 +793,7 @@ export default function Home() {
             targetCountry ?? undefined,
             player.country_code,
           )
+          if (data.missile_id) launchedMissileIdsRef.current.add(data.missile_id)
           setActiveCount(prev => prev + quantity)
         }
         if (weaponType === 'missile') setMissiles(prev => prev - quantity)
