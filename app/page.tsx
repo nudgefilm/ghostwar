@@ -171,6 +171,7 @@ export default function Home() {
   const [playerAllianceId, setPlayerAllianceId] = useState<string | null>(null)
   const [allianceRanking, setAllianceRanking] = useState<{ nickname: string; country_code: string; missiles: number }[]>([])
   const [declaredWar, setDeclaredWar] = useState<WarDeclaration | null>(null)
+  const [autoStrikeEnabled, setAutoStrikeEnabled] = useState(false)
   const [declaredWarKey, setDeclaredWarKey] = useState(0)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -216,6 +217,31 @@ export default function Home() {
         setPlayerAllianceId(row?.alliance_id ?? null)
       })
   }, [player])
+
+  // ── Auto-strike toggle (GHOSTWAR only) ────────────────────────────────────
+  useEffect(() => {
+    if (player?.nickname !== 'GHOSTWAR') return
+    fetch('/api/admin/toggle-auto-strike')
+      .then(r => r.json())
+      .then(d => setAutoStrikeEnabled((d as { enabled: boolean }).enabled))
+      .catch(() => {})
+  }, [player])
+
+  const handleAutoStrikeToggle = useCallback(async () => {
+    if (!player) return
+    const next = !autoStrikeEnabled
+    setAutoStrikeEnabled(next)
+    try {
+      const res = await fetch('/api/admin/toggle-auto-strike', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: player.id, enabled: next }),
+      })
+      if (!res.ok) setAutoStrikeEnabled(!next)
+    } catch {
+      setAutoStrikeEnabled(!next)
+    }
+  }, [player, autoStrikeEnabled])
 
   // ── Declared war fetch ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -1201,6 +1227,14 @@ export default function Home() {
               <div className="flex items-center gap-4 text-[10px]">
                 <span className="text-zinc-200">🚀 <span className="text-green-400 font-bold">{missiles}</span></span>
                 <span className="text-zinc-200">☢️ <span className="text-orange-400 font-bold">{nukes}</span></span>
+                {player?.nickname === 'GHOSTWAR' && (
+                  <button
+                    onClick={handleAutoStrikeToggle}
+                    className={`text-[10px] transition-colors cursor-pointer ${autoStrikeEnabled ? 'text-green-400' : 'text-zinc-500'}`}
+                  >
+                    AUTO{autoStrikeEnabled ? '[✓]' : '[ ]'}
+                  </button>
+                )}
                 <button
                   onClick={handleLogout}
                   className="ml-auto text-zinc-400 text-[10px] hover:text-zinc-300 transition-colors cursor-pointer"
