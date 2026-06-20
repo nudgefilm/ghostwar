@@ -55,6 +55,7 @@ export function useRealtimeMissiles({
   }, [onMissile, onNews, onCountryUpdate])
 
   useEffect(() => {
+    console.log('[useRealtimeMissiles] mounted — build 85681b2')
     const supabase = createClient()
 
     // Realtime: countries UPDATE (online_users, damage_percent 등 즉시 반영)
@@ -69,7 +70,9 @@ export function useRealtimeMissiles({
       )
       .subscribe()
 
+    let tickCount = 0
     const poll = async () => {
+      tickCount++
       const since = lastPollTimeRef.current
       const now = new Date().toISOString()
       lastPollTimeRef.current = now  // advance immediately so concurrent polls never share the same window
@@ -87,6 +90,10 @@ export function useRealtimeMissiles({
           .order('created_at', { ascending: true }),
       ])
 
+      // Periodic tick log (every 10s) — confirms polling is alive regardless of results
+      if (tickCount % 10 === 0) {
+        console.log(`[poll] tick #${tickCount} | missiles: ${newMissiles?.length ?? 'err'} | news: ${newNews?.length ?? 'err'} | since: ${since.slice(11, 19)}`)
+      }
       if (missileError) console.error('[poll] missiles error:', missileError)
       if (newMissiles && newMissiles.length > 0) {
         console.log('[poll] missiles found:', newMissiles.length, newMissiles.map((m: Record<string, unknown>) => `${String(m.launcher_country)}->${String(m.target_country)}`))
