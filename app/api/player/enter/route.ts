@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   const { data: updated, error: updateError } = await supabase
     .from('players')
-    .update({ country_code })
+    .update({ country_code, last_seen_at: new Date().toISOString() })
     .eq('id', existing.id)
     .select('id, nickname, country_code, missiles_remaining, nukes_remaining')
     .single()
@@ -40,6 +40,9 @@ export async function POST(req: NextRequest) {
   if (sameCountry) {
     await supabase.rpc('adjust_online_users', { p_code: country_code, p_delta: 1 })
   }
+
+  // Recalculate all countries' online_users from last_seen_at to clear stale counts
+  await supabase.rpc('refresh_all_online_users')
 
   // nukes_remaining: use pre-update value — some DB triggers (e.g. daily reset) may zero it out
   // during the UPDATE call even though we only changed country_code.

@@ -584,6 +584,21 @@ export default function Home() {
     return () => clearInterval(id)
   }, [])
 
+  // ── Heartbeat: keep last_seen_at fresh while tab is open ──────────────────
+  useEffect(() => {
+    if (!player) return
+    const send = () => {
+      fetch('/api/player/heartbeat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ player_id: player.id }),
+      }).catch(() => {})
+    }
+    send() // immediate on mount so enter + first heartbeat align
+    const id = setInterval(send, 30_000)
+    return () => clearInterval(id)
+  }, [player])
+
   // ── Decrement online_users on tab close / navigation ─────────────────────
   useEffect(() => {
     let fired = false
